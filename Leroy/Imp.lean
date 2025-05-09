@@ -228,7 +228,7 @@ theorem cexec_bounded_complete :
       sorry
     case WHILE => sorry
 
-@[grind] inductive red : com ×store → com × store → Prop where
+@[grind] inductive red : com × store → com × store → Prop where
   | red_assign: ∀ x a s,
       red (.ASSIGN x a, s) (.SKIP, update x (aeval s a) s)
   | red_seq_done: ∀ c s,
@@ -240,7 +240,7 @@ theorem cexec_bounded_complete :
       red (.IFTHENELSE b c1 c2, s) ((if beval s b then c1 else c2), s)
   | red_while_done: ∀ b c s,
       beval s b = false →
-      red (.WHILE b c, s) (SKIP, s)
+      red (.WHILE b c, s) (.SKIP, s)
   | red_while_loop: ∀ b c s,
       beval s b = true →
       red (.WHILE b c, s) (.SEQ c (.WHILE b c), s)
@@ -325,7 +325,7 @@ def goes_wrong (c: com) (s: store) : Prop := ∃ c', ∃ s', star red (c, s) (c'
 theorem not_goes_wrong : ∀ c s, ¬(goes_wrong c s) := by
   sorry
 
-theorem red_seq_steps (c2 c c' : com) (s s' : store) : star red (c, s) (c', s') → star red ((c;;c2), s) ((c';;c2), s') := by
+@[grind] theorem red_seq_steps (c2 c c' : com) (s s' : store) : star red (c, s) (c', s') → star red ((c;;c2), s) ((c';;c2), s') := by
   intro H
   generalize h₁ : (c,s) = v₁
   generalize h₂ : (c',s') = v₂
@@ -349,6 +349,30 @@ theorem red_seq_steps (c2 c c' : com) (s s' : store) : star red (c, s) (c', s') 
     apply a₁
     rfl
 
+theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s) (.SKIP, s') := by
+  intro h
+  induction h
+  any_goals grind
+  case cexec_seq ih1 ih2  =>
+    apply star_trans
+    apply red_seq_steps
+    apply ih1
+    apply star.star_step
+    apply red.red_seq_done
+    apply ih2
+  case cexec_while_loop ih1 ih2 =>
+    apply star_trans
+    apply star_one
+    apply red.red_while_loop
+    grind
+    apply star_trans
+    apply red_seq_steps
+    apply ih1
+    apply star_trans
+    rotate_left
+    apply ih2
+    apply star_one
+    apply red.red_seq_done
 
 theorem red_append_cexec:
   ∀ c1 s1 c2 s2, red (c1, s1) (c2, s2) →

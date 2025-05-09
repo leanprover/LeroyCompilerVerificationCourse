@@ -27,17 +27,17 @@ theorem cycle_infseq {R : α → α → Prop} (x : α) : R x x → infseq R x :=
   all_goals exact Rxx
 
 -- Inductive predicate, as a inductive definition
-inductive star (R : α → α → Prop) : α → α → Prop where
+@[grind] inductive star (R : α → α → Prop) : α → α → Prop where
   | star_refl : ∀ x : α, star R x x
   | star_step : ∀ x y z, R x y → star R y z → star R x z
 
-theorem star_one (R : α → α → Prop) : ∀ a b : α, R a b → star R a b := by
+@[grind] theorem star_one (R : α → α → Prop) : ∀ a b : α, R a b → star R a b := by
   intros a b Rab
   apply star.star_step
   exact Rab
   apply star.star_refl
 
-theorem star_trans {α} (R : α → α → Prop) : ∀ (a b : α), star R a b → ∀ c : α, star R b c → star R a c := by
+@[grind] theorem star_trans {α} (R : α → α → Prop) : ∀ (a b : α), star R a b → ∀ c : α, star R b c → star R a c := by
   intros a b sab
   intro c
   intro sbc
