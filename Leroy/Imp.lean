@@ -1,6 +1,7 @@
 import «Leroy».Sequences
 
 set_option grind.debug true
+set_option grind.warning false
 
 -- Definition ident := string.
 
@@ -48,7 +49,7 @@ theorem aeval_free :
     fun_induction aeval
     any_goals grind
 
-inductive bexp : Type :=
+inductive bexp : Type where
   | TRUE                              -- always true
   | FALSE                             -- always false
   | EQUAL (a1: aexp) (a2: aexp)       -- whether [a1 = a2]
@@ -88,7 +89,7 @@ To complete the definition of the IMP language, here is the
   abstract syntax of commands, also known as statements.
 -/
 
-inductive com: Type :=
+inductive com: Type where
   | SKIP                                     -- do nothing
   | ASSIGN (x : ident) (a: aexp)              -- assignment: [v := a]
   | SEQ (c1: com) (c2: com)                  -- sequence: [c1; c2]
@@ -374,22 +375,24 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
     apply star_one
     apply red.red_seq_done
 
-theorem red_append_cexec:
-  ∀ c1 s1 c2 s2, red (c1, s1) (c2, s2) →
+theorem red_append_cexec (c1 c2 : com) (s1 s2 : store):
+  red (c1, s1) (c2, s2) →
   ∀ s', cexec s2 c2 s' →  cexec s1 c1 s' := by
-    intro c1 s1 c2 s2
-    intro step
-    generalize h₁ : (c1, s1) = prem₁
-    generalize h₂ : (c2, s2) = prem₂
-    rw [h₁, h₂] at step
-    induction step
+    intro h
+    generalize h₁ : (c1, s1) = x
+    generalize h₂ : (c2, s2) = y
+    rw [h₁, h₂] at h
+    induction h
     any_goals grind
-    case red_seq_done c2' intermediate =>
+    case red_seq_done =>
       simp at h₁ h₂
-      simp [h₁, h₂]
-      intro ending
-      intro second_transition
+      rw [←h₂.1, ←h₂.2] at h₁
+      rw [←h₁.2, h₁.1]
+      intro any_store
+      intro h3
       apply cexec.cexec_seq
       apply cexec.cexec_skip
-      apply second_transition
-    any_goals sorry
+      apply h3
+    case red_seq_step a a_ih =>
+      simp at h₁ h₂
+      sorry
