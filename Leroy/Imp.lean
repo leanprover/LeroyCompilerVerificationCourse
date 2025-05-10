@@ -391,7 +391,7 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
     generalize heq1 : (c1, s1) = h1
     generalize heq2 : (c2, s2) = h2
     rw [heq1, heq2] at h
-    induction h generalizing c1 s1 s
+    induction h generalizing c1 c2 s
     any_goals grind
     case red_seq_done =>
       simp only [Prod.mk.injEq] at heq1
@@ -399,11 +399,6 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
       apply cexec.cexec_seq
       . apply cexec.cexec_skip
       . grind
-    case red_seq_step _ a_ih =>
-      simp at a_ih
-      simp only [Prod.mk.injEq] at heq1
-      simp only [heq1]
-      sorry
 
 theorem reds_to_cexec (s s' : store) (c : com) :
   star red (c, s) (.SKIP, s') → cexec s c s' := by
