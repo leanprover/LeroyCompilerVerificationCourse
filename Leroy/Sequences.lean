@@ -111,4 +111,4 @@ theorem infseq_coinduction_principle_2:
       any_goals grind
 
 
-@[grind]def irred (R : α → α → Prop) (a : α) : Prop := forall b, ¬(R a b)
+@[grind] def irred (R : α → α → Prop) (a : α) : Prop := forall b, ¬(R a b)
