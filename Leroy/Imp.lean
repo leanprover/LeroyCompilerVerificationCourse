@@ -3,8 +3,6 @@ import «Leroy».Sequences
 set_option grind.debug true
 set_option grind.warning false
 
--- Definition ident := string.
-
 def ident := String deriving BEq
 
 @[grind] inductive aexp : Type where
@@ -406,8 +404,25 @@ theorem reds_to_cexec (s s' : store) (c : com) :
     generalize heq1 : (c, s) = h1
     generalize heq2 : (com.SKIP, s') = h2
     rw [heq1, heq2] at h
-    induction h generalizing c s
-    all_goals grind
+    induction h generalizing s c s'
+    case star_refl =>
+      grind
+    case star_step r _ a_ih =>
+      apply red_append_cexec
+      rw [←heq1] at r
+      exact r
+      apply a_ih
+      any_goals grind
+
+-- bug
+-- theorem reds_to_cexec (s s' : store) (c : com) :
+--   star red (c, s) (.SKIP, s') → cexec s c s' := by
+--     intro h
+--     generalize heq1 : (c, s) = h1
+--     generalize heq2 : (com.SKIP, s') = h2
+--     rw [heq1, heq2] at h
+--     induction h generalizing c s
+--     all_goals grind
 
 @[grind] inductive cont : Type where
 | Kstop
