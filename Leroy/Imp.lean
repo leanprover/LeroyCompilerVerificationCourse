@@ -211,7 +211,27 @@ theorem cexec_bounded_complete (s s' : store) (c : com):
         specialize a_ih2 m (by grind)
         exact a_ih2
     case cexec_ifthenelse s b c1 c2 s' a a_ih =>
-      sorry
+      apply Exists.elim a_ih
+      intro fuel
+      intro a_ih
+      apply Exists.intro (fuel + 1)
+      intro bigger_fuel
+      intro gt
+      unfold cexec_bounded
+      have gt' : bigger_fuel > 0 := by grind
+      split
+      case h_1 => grind
+      case h_2 f =>
+        simp
+        split
+        case isTrue w =>
+          specialize a_ih f (by grind)
+          simp [w] at a_ih
+          exact a_ih
+        case isFalse w =>
+          specialize a_ih f (by grind)
+          simp [w] at a_ih
+          exact a_ih
     case cexec_while_done =>
       apply Exists.intro 1
       intro fuel fgt
