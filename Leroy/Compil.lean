@@ -1,5 +1,7 @@
 import «Leroy».Sequences
 import «Leroy».Imp
+import Init.Data.List.Basic
+
 set_option grind.warning false
 
 @[grind] inductive instr : Type where
@@ -14,23 +16,18 @@ set_option grind.warning false
   | Ihalt
     deriving Repr
 
-def code := List instr
-
-instance : HAppend code code code where
-  hAppend := List.append
-
-@[grind] def codelen (c: code) : Int := c.length
+@[grind] def codelen (c: List instr) : Int := c.length
 
 def stack : Type := List Int
 
 def config : Type := Int × stack × store
 
-@[grind] def instr_at (C : code) (pc : Int) : Option instr :=
+@[grind] def instr_at (C : List instr) (pc : Int) : Option instr :=
   match C with
   | [] => .none
   | i :: C' => if pc = 0 then .some i else instr_at C' (pc - 1)
 
-@[grind] inductive transition (C: code): config → config → Prop where
+@[grind] inductive transition (C: List instr): config → config → Prop where
   | trans_const : ∀ pc stk s n,
       instr_at C pc = .some (.Iconst n) →
       transition C (pc    , stk     , s)
@@ -67,14 +64,14 @@ def config : Type := Int × stack × store
       transition C (pc , n2 :: n1 :: stk, s)
                    (pc', stk            , s)
 
-def transitions (C: code) : config -> config -> Prop :=
+def transitions (C: List instr) : config -> config -> Prop :=
   star (transition C)
 
-def machine_terminates (C: code) (s_init: store) (s_final: store) : Prop :=
+def machine_terminates (C: List instr) (s_init: store) (s_final: store) : Prop :=
   exists pc, transitions C (0, [], s_init) (pc, [], s_final)
           ∧ instr_at C pc = .some .Ihalt
 
-def machine_goes_wrong (C: code) (s_init: store) : Prop :=
+def machine_goes_wrong (C: List instr) (s_init: store) : Prop :=
   exists pc stk s,
       transitions C (0, [], s_init) (pc, stk, s)
    ∧ irred (transition C) (pc, stk, s)
@@ -99,7 +96,7 @@ def compile_bexp (b: bexp) (d1: Int) (d0: Int) : List instr :=
       let code1 := compile_bexp b1 0 (codelen code2 + d0)
       code1 ++ code2
 
-def compile_com (c: com) : List instr :=
+def compile_com (c: com) : List instr:=
   match c with
   | .SKIP =>
       []
@@ -121,15 +118,15 @@ def compile_com (c: com) : List instr :=
       ++ code_body
       ++ .Ibranch (- (codelen code_test + codelen code_body + 1)) :: []
 
-def compile_program (p: com) : code :=
+def compile_program (p: com) : List instr:=
   compile_com p ++ .Ihalt :: []
 
 #eval (compile_program (.ASSIGN "x" (.PLUS (.VAR "x") (.CONST 1))))
 
-def smart_Ibranch (d: Int) : code :=
+def smart_Ibranch (d: Int) : List instr:=
   if d = 0 then [] else .Ibranch d :: []
 
-@[grind] inductive code_at: code -> Int -> code -> Prop where
+@[grind] inductive code_at: List instr-> Int -> List instr-> Prop where
   | code_at_intro: forall C1 C2 C3 pc,
       pc = codelen C1 ->
       code_at (C1 ++ C2 ++ C3) pc C2
@@ -141,10 +138,7 @@ theorem codelen_app:
   forall c1 c2, codelen (c1 ++ c2) = codelen c1 + codelen c2 := by
     intro c1 c2
     induction c1
-    case nil =>
-      rw [List.nil_append]
-      unfold codelen
-      grind
+    all_goals grind
 
 theorem instr_a : forall i c2 c1 pc,
   pc = codelen c1 ->
@@ -159,7 +153,6 @@ theorem instr_a : forall i c2 c1 pc,
       intro h1
       split
       all_goals grind [List.append_eq]
-
 
 @[grind] theorem instr_at_app:
   ∀ i c2 c1 pc,
@@ -182,62 +175,85 @@ theorem code_at_head :
     generalize heq1 : (i :: C') = x
     rw [heq1] at H
     induction H
-    case code_at_intro c1 c2 c3 pc' a =>
-      rw [←heq1, ←List.append_eq]
+    case code_at_intro c1 c2 c3 oc a =>
+      unfold instr_at
+      rw [←heq1]
+      induction c1 generalizing oc
+      case nil =>
+        grind
+      case cons h t t_ih =>
+        have _ : oc ≠ 0 := by grind
+        have _ : t ++ i :: (C' ++ c3) ≠ [] := by grind
+        dsimp
+        grind
+
+theorem code_at_tail :
+   forall C pc i C',
+  code_at C pc (i :: C') →
+  code_at C (pc + 1) C' := by
+    intro C pc i C' h
+    cases h
+    case code_at_intro c1 c3 a =>
+      have s : c1 ++ i :: C' ++ c3 = c1 ++ [i] ++ C' ++ c3 := by sorry
+      rw [s]
+      apply code_at.code_at_intro
+      grind
+
+theorem code_at_app_left:
+  forall C pc C1 C2,
+  code_at C pc (C1 ++ C2) ->
+  code_at C pc C1 := by
+    intro c pc m1 m2 h
+    cases h
+    case code_at_intro c1 c3 a =>
+      have := code_at.code_at_intro c1 m1 (m2 ++ c3) pc a
+      grind [List.append_assoc]
+
+theorem code_at_app_right:
+  forall C pc C1 C2,
+  code_at C pc (C1 ++ C2) ->
+  code_at C (pc + codelen C1) C2 := by
+    intro C pc c1 c2 h
+    cases h
+    case code_at_intro b e a =>
+      have := code_at.code_at_intro (b ++ c1) c2 e (pc + codelen c1) (by grind)
+      grind [List.append_assoc]
+
+theorem code_at_app_right2 : forall C pc C1 C2 C3,
+  code_at C pc (C1 ++ C2 ++ C3) →
+  code_at C (pc + codelen C1) C2 := by
+    intro C pc c1 c2 c3 h
+    cases h
+    case code_at_intro b e a =>
+      have := code_at.code_at_intro (b ++ c1) c2 (c3 ++ e) (pc + codelen c1) (by grind)
+      grind [List.append_assoc]
+
+theorem code_at_nil : forall C pc C1,
+  code_at C pc C1 -> code_at C pc [] := by
+    intro C pc c1 h
+    cases h
+    case code_at_intro b e a =>
+      have := code_at.code_at_intro b [] (c1 ++ e) pc a
+      grind [List.append_nil, List.append_assoc]
+
+theorem instr_at_code_at_nil :
+  forall C pc i, instr_at C pc = .some i -> code_at C pc [] := by
+    intro C pc i h
+    have := code_at.code_at_intro C [] [] pc
+    have : pc = codelen C → code_at C pc [] := by grind [List.append_nil, List.append_assoc]
+    apply this
+    induction C generalizing pc i
+    case nil => grind
+    case cons f t t_ih _ =>
       sorry
 
 
 
 
 
--- Lemma code_at_tail:
---   forall C pc i C',
---   code_at C pc (i :: C') ->
---   code_at C (pc + 1) C'.
--- Proof.
---   intros. inversion H.
---   change (C1 ++ (i :: C') ++ C3)
---     with (C1 ++ (i :: nil) ++ C' ++ C3).
---   rewrite <- app_ass. constructor. rewrite codelen_app. subst pc. auto.
--- Qed.
 
-theorem code_at_app_left:
-  forall C pc C1 C2,
-  code_at C pc (C1 ++ C2) ->
-  code_at C pc C1 := by
-    intro c pc c1 c2 H
-    generalize heq : (c1 ++ c2) = x
-    rw [heq] at H
-    induction H
-    sorry
 
--- Proof.
---   intros. inversion H. rewrite app_ass. constructor. auto.
--- Qed.
 
--- Lemma code_at_app_right:
---   forall C pc C1 C2,
---   code_at C pc (C1 ++ C2) ->
---   code_at C (pc + codelen C1) C2.
--- Proof.
---   intros. inversion H. rewrite app_ass. rewrite <- app_ass. constructor. rewrite codelen_app. subst pc. auto.
--- Qed.
-
--- Lemma code_at_app_right2:
---   forall C pc C1 C2 C3,
---   code_at C pc (C1 ++ C2 ++ C3) ->
---   code_at C (pc + codelen C1) C2.
--- Proof.
---   intros. apply code_at_app_right. apply code_at_app_left with (C2 := C3). rewrite app_ass; auto.
--- Qed.
-
--- Lemma code_at_nil:
---   forall C pc C1,
---   code_at C pc C1 -> code_at C pc nil.
--- Proof.
---   intros. inversion H. subst. change (C1 ++ C3) with (nil ++ C1 ++ C3).
---   constructor. auto.
--- Qed.
 
 -- Lemma instr_at_code_at_nil:
 --   forall C pc i, instr_at C pc = Some i -> code_at C pc nil.
