@@ -356,36 +356,21 @@ def goes_wrong (c: com) (s: store) : Prop := ∃ c', ∃ s', star red (c, s) (c'
 
 theorem not_goes_wrong : ∀ c s, ¬(goes_wrong c s) := by
   intro c s
-  induction c generalizing s
-  case SKIP =>
-    unfold goes_wrong; grind
-  case ASSIGN x a =>
-    unfold goes_wrong
-    simp
-    intro c' s' h h2
-    generalize heq1 : (com.ASSIGN x a, s) = g1
-    generalize heq2 : (c', s') = g2
-    rw [heq1, heq2] at h
-    induction h
-    case star_refl => grind
-    case star_step y z w a1 a2 a_ih =>
-      rw [←heq1] at a1
-      cases a1
-      . grind
-  case SEQ c1 c2 c1_ih c2_ih  =>
-    unfold goes_wrong at *
-    simp
-    intro c' s' h h2
-    generalize heq1 : (c1 ;; c2, s) = g1
-    generalize heq2 : (c', s') = g2
-    rw [heq1, heq2] at h
-    induction h
-    case star_refl x =>
-      sorry
-    case star_step a1 a2 a_ih =>
-      sorry
-  case IFTHENELSE => sorry
-  case WHILE => sorry
+  unfold goes_wrong
+  simp
+  intro end_command end_store
+  intro reachable irreducible
+  generalize heq1 : (c,s) = arg1
+  generalize heq2 : (end_command, end_store) = arg2
+  rw [heq1, heq2] at reachable
+  induction reachable generalizing c s
+  case star_refl =>
+    unfold irred at irreducible
+    sorry
+  case star_step x y z r a a_ih =>
+    sorry
+
+
 
 
 

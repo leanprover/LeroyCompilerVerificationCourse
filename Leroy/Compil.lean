@@ -194,7 +194,7 @@ theorem code_at_tail :
     intro C pc i C' h
     cases h
     case code_at_intro c1 c3 a =>
-      have s : c1 ++ i :: C' ++ c3 = c1 ++ [i] ++ C' ++ c3 := by sorry
+      have s : c1 ++ i :: C' ++ c3 = c1 ++ [i] ++ C' ++ c3 := by grind [List.append_cons]
       rw [s]
       apply code_at.code_at_intro
       grind
@@ -239,31 +239,20 @@ theorem code_at_nil : forall C pc C1,
 theorem instr_at_code_at_nil :
   forall C pc i, instr_at C pc = .some i -> code_at C pc [] := by
     intro C pc i h
-    have := code_at.code_at_intro C [] [] pc
-    have : pc = codelen C → code_at C pc [] := by grind [List.append_nil, List.append_assoc]
-    apply this
     induction C generalizing pc i
     case nil => grind
-    case cons f t t_ih _ =>
-      sorry
-
-
-
-
-
-
-
-
-
--- Lemma instr_at_code_at_nil:
---   forall C pc i, instr_at C pc = Some i -> code_at C pc nil.
--- Proof.
---   induction C; cbn; intros.
--- - discriminate.
--- - destruct (pc =? 0) eqn:PC.
--- + assert (pc = 0) by (apply Z.eqb_eq; auto). subst pc.
---   change (a :: C) with (nil ++ nil ++ (a :: C)). constructor. auto.
--- + assert (A: code_at C (pc - 1) nil) by eauto.
---   inversion A; subst.
---   apply code_at_intro with (C1 := a :: C1) (C3 := C3). rewrite codelen_cons. lia.
--- Qed.
+    case cons f t t_ih =>
+      unfold instr_at at h
+      by_cases pc = 0
+      rotate_left
+      next nz =>
+        simp [nz] at h
+        specialize t_ih (pc - 1) i h
+        cases t_ih
+        next c1 c3 a =>
+          simp
+          have := code_at.code_at_intro (f :: c1) [] c3 pc
+          grind
+      next z =>
+        have := code_at.code_at_intro [] [] (f :: t) pc
+        grind [List.nil_append]

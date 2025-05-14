@@ -37,7 +37,7 @@ theorem cycle_infseq {R : α → α → Prop} (x : α) : R x x → infseq R x :=
   exact Rab
   grind
 
-@[grind]theorem star_trans {α} (R : α → α → Prop) : ∀ (a b : α), star R a b → ∀ c : α, star R b c → star R a c := by
+@[grind] theorem star_trans {α} (R : α → α → Prop) : ∀ (a b : α), star R a b → ∀ c : α, star R b c → star R a c := by
   intros a b sab
   intro c
   intro sbc
