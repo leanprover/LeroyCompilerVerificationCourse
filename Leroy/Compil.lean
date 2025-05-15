@@ -257,6 +257,13 @@ theorem code_at_head :
         have := code_at.code_at_intro [] [] (f :: t) pc
         grind [List.nil_append]
 
+theorem code_at_to_instr_at : code_at C pc (c1 ++ i :: c2) → instr_at C (pc + codelen c1) = .some i := by
+    intro h
+    cases h
+    next b e a =>
+      have := instr_at_app i (c2 ++ e) (b ++ c1) (pc + codelen c1) (by simp [codelen]; grind)
+      grind [List.append_assoc, List.append_eq]
+
 theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) (stk : stack) :
   code_at C pc (compile_aexp a) →
   transitions C (pc, stk, s) (pc + codelen (compile_aexp a), aeval s a :: stk, s) := by
@@ -317,14 +324,21 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
             grind
         . apply star_trans
           . apply star_one
-            have := @transition.trans_opp C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) ((aeval s a1) ::stk) s (aeval s a2)
-            apply this
-            cases a
-            next c1 c3 a =>
-              have := instr_a instr.Iopp (instr.Iadd :: c3) (c1 ++ compile_aexp a1 ++ compile_aexp a2) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2))
-              grind [List.append_assoc, List.cons_append, List.nil_append, List.append_eq]
+            . have := @transition.trans_opp C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) ((aeval s a1) ::stk) s (aeval s a2)
+              apply this
+              cases a
+              next c1 c3 a =>
+                have := instr_a instr.Iopp (instr.Iadd :: c3) (c1 ++ compile_aexp a1 ++ compile_aexp a2) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2))
+                grind [List.append_assoc, List.cons_append, List.nil_append, List.append_eq]
           . apply star_one
-            sorry
+            . have := @code_at_to_instr_at C pc (compile_aexp a1 ++ compile_aexp a2 ++ [instr.Iopp])  instr.Iadd [] (by grind [List.append_assoc, List.cons_append, List.nil_append, List.append_eq])
+              simp [codelen] at this
+              have := @transition.trans_add C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2) + 1) stk s (aeval s a1) (-aeval s a2) (by grind)
+              simp [codelen] at *
+              grind
+
+
+
 
 
 
