@@ -257,7 +257,7 @@ theorem code_at_head :
         have := code_at.code_at_intro [] [] (f :: t) pc
         grind [List.nil_append]
 
-theorem code_at_to_instr_at : code_at C pc (c1 ++ i :: c2) → instr_at C (pc + codelen c1) = .some i := by
+@[grind] theorem code_at_to_instr_at : code_at C pc (c1 ++ i :: c2) → instr_at C (pc + codelen c1) = .some i := by
     intro h
     cases h
     next b e a =>
@@ -288,17 +288,11 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
       intro a
       apply star_trans
       . apply a1_ih
-        cases a
-        next c1 c3 a2 =>
-          have := code_at.code_at_intro c1 (compile_aexp a1) [instr.Iadd] pc a2
-          grind
+        grind
       . apply star_trans
         . specialize a2_ih C (pc + codelen (compile_aexp a1)) (aeval s a1 :: stk)
           apply a2_ih
-          cases a
-          next c1 c3 a =>
-            have := code_at.code_at_intro c1 (compile_aexp a2) (compile_aexp a2 ++ [instr.Iadd] ++ c3) pc a
-            grind
+          grind
         . apply star_one
           cases a
           next c1 c3 a =>
@@ -311,29 +305,19 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
       intro a
       apply star_trans
       . apply a1_ih
-        . cases a
-          next c1 c3 a =>
-            have := code_at.code_at_intro c1 (compile_aexp a1) ([instr.Iopp, instr.Iadd] ++ c3) pc a
-            grind [List.append_assoc, List.cons_append, List.nil_append]
+        . grind
       . apply star_trans
         . specialize a2_ih C (pc + codelen (compile_aexp a1)) (aeval s a1 :: stk)
           apply a2_ih
-          cases a
-          next c1 c3 a =>
-            have := code_at.code_at_intro (c1 ++ (compile_aexp a1)) (compile_aexp a2) ([instr.Iopp, instr.Iadd] ++ c3)   (pc + codelen (compile_aexp a1)) (by grind)
-            grind
+          grind
         . apply star_trans
           . apply star_one
             . have := @transition.trans_opp C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) ((aeval s a1) ::stk) s (aeval s a2)
               apply this
-              cases a
-              next c1 c3 a =>
-                have := instr_a instr.Iopp (instr.Iadd :: c3) (c1 ++ compile_aexp a1 ++ compile_aexp a2) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2))
-                grind [List.append_assoc, List.cons_append, List.nil_append, List.append_eq]
+              grind
           . apply star_one
-            . have := @code_at_to_instr_at C pc (compile_aexp a1 ++ compile_aexp a2 ++ [instr.Iopp])  instr.Iadd [] (by grind [List.append_assoc, List.cons_append, List.nil_append, List.append_eq])
-              simp [codelen] at this
-              have := @transition.trans_add C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2) + 1) stk s (aeval s a1) (-aeval s a2) (by grind)
+            . have := @code_at_to_instr_at C pc (compile_aexp a1 ++ compile_aexp a2 ++ [instr.Iopp])  instr.Iadd [] (by grind [List.append_assoc, List.cons_append, List.nil_append])
+              have := @transition.trans_add C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2) + 1) stk s (aeval s a1) (-aeval s a2) (by simp [codelen] at *; grind)
               simp [codelen] at *
               grind
 
