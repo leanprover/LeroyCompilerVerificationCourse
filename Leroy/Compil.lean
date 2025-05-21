@@ -124,8 +124,6 @@ h_1 : ¬star (transition C) c₁ c₂
 theorem grind_weirdness : transitions C c₁ c₂ → (star (transition C)) c₁ c₂ := by
   grind [transitions]
 
-
-
 def machine_terminates (C: List instr) (s_init: store) (s_final: store) : Prop :=
   exists pc, transitions C (0, [], s_init) (pc, [], s_final)
           ∧ instr_at C pc = .some .Ihalt
@@ -136,14 +134,14 @@ def machine_goes_wrong (C: List instr) (s_init: store) : Prop :=
    ∧ irred (transition C) (pc, stk, s)
    ∧ (instr_at C pc ≠ .some .Ihalt ∨ stk ≠ [])
 
-@[grind ]def compile_aexp (a: aexp) : List instr :=
+@[grind] def compile_aexp (a: aexp) : List instr :=
   match a with
   | .CONST n => .Iconst n :: []
   | .VAR x => .Ivar x :: []
   | .PLUS a1 a2  => (compile_aexp a1) ++ (compile_aexp a2) ++ (.Iadd :: [])
   | .MINUS a1 a2 => compile_aexp a1 ++ compile_aexp a2 ++ (.Iopp :: .Iadd :: [])
 
-def compile_bexp (b: bexp) (d1: Int) (d0: Int) : List instr :=
+@[grind] def compile_bexp (b: bexp) (d1: Int) (d0: Int) : List instr :=
   match b with
   | .TRUE => if d1 = 0 then [] else .Ibranch d1 :: []
   | .FALSE => if d0 = 0 then [] else .Ibranch d0 :: []
@@ -198,7 +196,7 @@ def smart_Ibranch (d: Int) : List instr:=
 
 @[grind] theorem codelen_app:
   forall c1 c2, codelen (c1 ++ c2) = codelen c1 + codelen c2 := by
-    intro c1 c2
+    intro c1 _
     induction c1
     all_goals grind
 
@@ -374,7 +372,7 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
           grind
         . apply star_trans
           . apply star_one
-            . have := @transition.trans_opp C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) ((aeval s a1) ::stk) s (aeval s a2)
+            . have := @transition.trans_opp C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) ((aeval s a1) :: stk) s (aeval s a2)
               apply this
               grind
           . apply star_one

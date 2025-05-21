@@ -5,7 +5,7 @@ set_option grind.warning false
 
 def ident := String deriving BEq, Repr
 
-@[grind] inductive aexp : Type where
+inductive aexp : Type where
   | CONST (n : Int)
   | VAR (x : ident)
   | PLUS (a1 : aexp) (a2 : aexp)
@@ -38,13 +38,14 @@ theorem aeval_xplus1 : ∀ s x, aeval s (.PLUS (.VAR x) (.CONST 1)) > aeval s (.
   | .VAR y => y = x
   | .PLUS a1 a2 | .MINUS a1 a2 => free_in_aexp x a1 ∨ free_in_aexp x a2
 
+-- Nice example of using grind and fun_induction
 theorem aeval_free :
   ∀ s1 s2 a,
   (∀ x, free_in_aexp x a → s1 x = s2 x) →
   aeval s1 a = aeval s2 a := by
     intro s1 s2 a h
     fun_induction aeval s1 a
-    any_goals grind
+    all_goals grind
 
 inductive bexp : Type where
   | TRUE                              -- always true
@@ -53,10 +54,6 @@ inductive bexp : Type where
   | LESSEQUAL (a1: aexp) (a2: aexp)   -- whether [a1 <= a2]
   | NOT (b1: bexp)                    -- Boolean negation
   | AND (b1: bexp) (b2: bexp)       -- Boolean conjunction
-/--
-Just like arithmetic expressions evaluate to integers,
-  Boolean expressions evaluate to Boolean values [true] or [false].
--/
 
 def NOTEQUAL (a1 a2: aexp) : bexp := .NOT (.EQUAL a1 a2)
 
@@ -67,7 +64,6 @@ def GREATER (a1 a2: aexp) : bexp := .NOT (.LESSEQUAL a1 a2)
 def LESS (a1 a2: aexp) : bexp := GREATER a2 a1
 
 @[grind] def OR (b1 b2: bexp) : bexp := .NOT (.AND (.NOT b1) (.NOT b2))
-
 
 @[grind] def beval (s: store) (b: bexp) : Bool :=
   match b with
@@ -174,12 +170,12 @@ theorem cexec_bounded_complete (s s' : store) (c : com):
     intro h
     induction h
     case cexec_skip =>
-      apply Exists.intro 1
+      exists 1
       intro fuel' fgt
       induction fgt
       all_goals grind
     case cexec_assign =>
-      apply Exists.intro 1
+      exists 1
       intro fuel' fgt
       induction fgt
       any_goals grind
@@ -188,7 +184,7 @@ theorem cexec_bounded_complete (s s' : store) (c : com):
       intro fuel1 a_ih1
       apply Exists.elim a_ih2
       intro fuel2 a_ih2
-      apply Exists.intro (fuel1 + fuel2)
+      exists (fuel1 + fuel2)
       intro fuel' fgt
       have t : fuel' ≥ fuel1 ∧  fuel' ≥ fuel2 := by grind
       have t1 : fuel1 > 0 := by
@@ -214,7 +210,7 @@ theorem cexec_bounded_complete (s s' : store) (c : com):
       apply Exists.elim a_ih
       intro fuel
       intro a_ih
-      apply Exists.intro (fuel + 1)
+      exists (fuel + 1)
       intro bigger_fuel
       intro gt
       unfold cexec_bounded
@@ -233,7 +229,7 @@ theorem cexec_bounded_complete (s s' : store) (c : com):
           simp [w] at a_ih
           exact a_ih
     case cexec_while_done =>
-      apply Exists.intro 1
+      exists 1
       intro fuel fgt
       induction fgt
       all_goals grind
@@ -242,7 +238,7 @@ theorem cexec_bounded_complete (s s' : store) (c : com):
       intro fuel1 a_ih1
       apply Exists.elim a_ih2
       intro fuel2 a_ih2
-      apply Exists.intro (fuel1 + fuel2)
+      exists (fuel1 + fuel2)
       intro fuel' fgt
       have t1 : fuel1 > 0 := by
         false_or_by_contra
@@ -287,8 +283,8 @@ theorem red_progress:
     case ASSIGN identifier expression =>
       intro s
       apply Or.intro_right
-      apply Exists.intro com.SKIP
-      apply Exists.intro (update identifier (aeval s expression) s)
+      exists com.SKIP
+      exists (update identifier (aeval s expression) s)
       grind
     case SEQ c1 c2 c1_ih c2_ih =>
       intro s
@@ -297,8 +293,8 @@ theorem red_progress:
       case h.left =>
         intro c1_eq
         rw [c1_eq]
-        apply Exists.intro c2
-        apply Exists.intro s
+        exists c2
+        exists s
         grind
       case h.right =>
         intro h
@@ -306,8 +302,8 @@ theorem red_progress:
         intro c1' h
         apply Exists.elim h
         intro s' h
-        apply Exists.intro (.SEQ c1' c2)
-        apply Exists.intro s'
+        exists (.SEQ c1' c2)
+        exists s'
         grind
     case IFTHENELSE b c1 c2 c1_ih c2_ih =>
       intro s
@@ -319,8 +315,8 @@ theorem red_progress:
         apply Or.elim (c1_ih s)
         case left =>
           intro c1_skip
-          apply Exists.intro .SKIP
-          apply Exists.intro s
+          exists .SKIP
+          exists s
           grind
         case right => grind
       case h.right =>
@@ -328,8 +324,8 @@ theorem red_progress:
         apply Or.elim (c2_ih s)
         case left =>
           intro c2_skip
-          apply Exists.intro .SKIP
-          apply Exists.intro s
+          exists .SKIP
+          exists s
           grind
         case right => grind
     case WHILE b c ih =>
@@ -343,13 +339,13 @@ theorem red_progress:
         any_goals grind
         case left =>
           intro _
-          apply Exists.intro (.SEQ .SKIP  (.WHILE b c))
-          apply Exists.intro s
+          exists (.SEQ .SKIP  (.WHILE b c))
+          exists s
           grind
       case right =>
         intros
-        apply Exists.intro .SKIP
-        apply Exists.intro s
+        exists .SKIP
+        exists s
         grind
 
 def goes_wrong (c: com) (s: store) : Prop := ∃ c', ∃ s', star red (c, s) (c', s') ∧ irred red (c', s') ∧ c' ≠ .SKIP
@@ -391,7 +387,6 @@ theorem not_goes_wrong : ∀ c s, ¬(goes_wrong c s) := by
     . apply a_ih
       . rfl
       . exact h₂
-
 
 theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s) (.SKIP, s') := by
   intro h
@@ -457,18 +452,18 @@ The following theorem causes assertion violation in grind.
 We obtain the following:
 _private.Lean.Meta.Tactic.Grind.Inv.0.Lean.Meta.Grind.checkEqc Lean.Meta.Tactic.Grind.Inv:29:10: assertion violation: isSameExpr e ( __do_lift._@.Lean.Meta.Tactic.Grind.Inv._hyg.31.0 )
 -/
-theorem reds_to_cexec_with_grind (s s' : store) (c : com) :
-  star red (c, s) (.SKIP, s') → cexec s c s' := by
-    intro h
-    generalize heq1 : (c, s) = h1
-    generalize heq2 : (com.SKIP, s') = h2
-    rw [heq1, heq2] at h
-    induction h generalizing c s
-    case star_refl =>
-      grind
-    case star_step r _ a_ih =>
-      -- this is where the assertion violation happens
-      grind
+-- theorem reds_to_cexec_with_grind (s s' : store) (c : com) :
+--   star red (c, s) (.SKIP, s') → cexec s c s' := by
+--     intro h
+--     generalize heq1 : (c, s) = h1
+--     generalize heq2 : (com.SKIP, s') = h2
+--     rw [heq1, heq2] at h
+--     induction h generalizing c s
+--     case star_refl =>
+--       grind
+--     case star_step r _ a_ih =>
+--       -- this is where the assertion violation happens
+--       grind
 
 @[grind] inductive cont where
 | Kstop
