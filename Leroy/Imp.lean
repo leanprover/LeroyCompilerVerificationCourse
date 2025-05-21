@@ -43,7 +43,7 @@ theorem aeval_free :
   (∀ x, free_in_aexp x a → s1 x = s2 x) →
   aeval s1 a = aeval s2 a := by
     intro s1 s2 a h
-    fun_induction aeval
+    fun_induction aeval s1 a
     any_goals grind
 
 inductive bexp : Type where
@@ -156,17 +156,17 @@ theorem cexec_infinite_loop:
       else
         .some s
 
+-- Amazing that grind can easily deal with this
 theorem cexec_bounded_sound : ∀ fuel s c s',
     cexec_bounded fuel s c = .some s'
   → cexec s c s' := by
   intro fuel
   induction fuel
-  any_goals grind
   case succ fuel ih =>
-    intro s c
-    revert s
+    intros _ c
     induction c
-    any_goals grind
+    all_goals grind
+  all_goals grind
 
 theorem cexec_bounded_complete (s s' : store) (c : com):
   cexec s c s' →
@@ -370,10 +370,6 @@ theorem not_goes_wrong : ∀ c s, ¬(goes_wrong c s) := by
   case star_step x y z r a a_ih =>
     sorry
 
-
-
-
-
 @[grind] theorem red_seq_steps (c2 c c' : com) (s s' : store) : star red (c, s) (c', s') → star red ((c;;c2), s) ((c';;c2), s') := by
   intro H
   generalize h₁ : (c,s) = v₁
@@ -383,17 +379,19 @@ theorem not_goes_wrong : ∀ c s, ¬(goes_wrong c s) := by
   case star_refl =>
    grind
   case star_step x y _ a₁ a₂ a_ih =>
+    -- One could write grind here already, but it takes ages
     apply star.star_step
-    rotate_left
-    apply a_ih
-    rotate_left
-    exact h₂
-    exact y.1
-    exact y.2
-    apply red.red_seq_step
-    rw [←h₁] at a₁
-    apply a₁
-    grind
+    . apply red.red_seq_step
+      rotate_left
+      . exact y.1
+      . exact y.2
+      . -- putting a grind here is costly too
+        rw [h₁]
+        exact a₁
+    . apply a_ih
+      . rfl
+      . exact h₂
+
 
 theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s) (.SKIP, s') := by
   intro h
@@ -401,11 +399,11 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
   any_goals grind
   case cexec_seq ih1 ih2  =>
     apply star_trans
-    apply red_seq_steps
-    apply ih1
-    apply star.star_step
-    apply red.red_seq_done
-    apply ih2
+    . apply red_seq_steps
+      exact ih1
+    . apply star.star_step
+      apply red.red_seq_done
+      exact ih2
   case cexec_while_loop ih1 ih2 =>
     apply star_trans
     . apply star_one
@@ -419,6 +417,7 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
         . apply ih2
         . grind
 
+-- This requires a bit of trivial manipulation and grind cannot do that
 @[grind] theorem red_append_cexec (c1 c2 : com) (s1 s2 : store) :
   red (c1, s1) (c2, s2) →
   ∀ s', cexec s2 c2 s' → cexec s1 c1 s' := by
@@ -427,13 +426,15 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
     generalize heq2 : (c2, s2) = h2
     rw [heq1, heq2] at h
     induction h generalizing c1 c2 s
-    any_goals grind
     case red_seq_done =>
-      simp only [Prod.mk.injEq] at heq1
-      simp only [heq1]
+      simp only [Prod.mk.injEq] at heq1 heq2
+      rw [←heq2.1, ←heq2.2] at heq1
+      rw [heq1.1, heq1.2]
       apply cexec.cexec_seq
-      . apply cexec.cexec_skip
-      . grind
+      . -- grind fails on this subcase for example, despite the fact cexec is annotated with @[grind]
+        apply cexec.cexec_skip
+      . exact h2
+    all_goals grind
 
 theorem reds_to_cexec (s s' : store) (c : com) :
   star red (c, s) (.SKIP, s') → cexec s c s' := by
@@ -446,20 +447,28 @@ theorem reds_to_cexec (s s' : store) (c : com) :
       grind
     case star_step r _ a_ih =>
       apply red_append_cexec
-      rw [←heq1] at r
-      exact r
-      apply a_ih
-      any_goals grind
+      . rw [←heq1] at r
+        exact r
+      . apply a_ih
+        all_goals grind
 
--- bug
--- theorem reds_to_cexec (s s' : store) (c : com) :
---   star red (c, s) (.SKIP, s') → cexec s c s' := by
---     intro h
---     generalize heq1 : (c, s) = h1
---     generalize heq2 : (com.SKIP, s') = h2
---     rw [heq1, heq2] at h
---     induction h generalizing c s
---     all_goals grind
+/--
+The following theorem causes assertion violation in grind.
+We obtain the following:
+_private.Lean.Meta.Tactic.Grind.Inv.0.Lean.Meta.Grind.checkEqc Lean.Meta.Tactic.Grind.Inv:29:10: assertion violation: isSameExpr e ( __do_lift._@.Lean.Meta.Tactic.Grind.Inv._hyg.31.0 )
+-/
+theorem reds_to_cexec_with_grind (s s' : store) (c : com) :
+  star red (c, s) (.SKIP, s') → cexec s c s' := by
+    intro h
+    generalize heq1 : (c, s) = h1
+    generalize heq2 : (com.SKIP, s') = h2
+    rw [heq1, heq2] at h
+    induction h generalizing c s
+    case star_refl =>
+      grind
+    case star_step r _ a_ih =>
+      -- this is where the assertion violation happens
+      grind
 
 @[grind] inductive cont where
 | Kstop

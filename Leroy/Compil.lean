@@ -18,6 +18,50 @@ set_option grind.warning false
 
 @[grind] def codelen (c: List instr) : Int := c.length
 
+/--
+error: `grind` failed
+case grind
+h : ¬codelen [] = 0
+⊢ False
+[grind] Goal diagnostics
+  [facts] Asserted facts
+    [prop] ¬codelen [] = 0
+    [prop] codelen [] = ↑[].length
+    [prop] { toList := [] }.toList.length = 0
+    [prop] [].length = 0
+    [prop] { toList := [] }.toList.length = 0
+  [eqc] False propositions
+    [prop] codelen [] = 0
+  [eqc] Equivalence classes
+    [eqc] {codelen [], ↑[].length}
+    [eqc] {{ toList := [] }.toList, []}
+    [eqc] {{ toList := [] }.toList.length, [].length, 0}
+  [ematch] E-matching patterns
+    [thm] codelen.eq_1: [codelen #0]
+    [thm] codelen.eq_1: [codelen #0]
+    [thm] Array.size_empty: [@List.length #0 (@List.nil _)]
+    [thm] List.size_toArray: [@List.length #1 #0]
+    [thm] List.length_nil: [@List.length #0 (@List.nil _)]
+    [thm] Array.length_toList: [@List.length #1 (@Array.toList _ #0)]
+    [thm] Array.eq_empty_of_size_eq_zero: [@List.length #2 (@Array.toList _ #1)]
+    [thm] Array.size_eq_zero_iff: [@List.length #1 (@Array.toList _ #0)]
+    [thm] Vector.toArray_empty: [@Array.mk #0 (@List.nil _)]
+    [thm] Array.toArray_toList: [@Array.mk #1 (@Array.toList _ #0)]
+[grind] Diagnostics
+  [thm] E-Matching instances
+    [thm] Array.eq_empty_of_size_eq_zero ↦ 1
+    [thm] Array.length_toList ↦ 1
+    [thm] Array.size_empty ↦ 1
+    [thm] Array.size_eq_zero_iff ↦ 1
+    [thm] Array.toArray_toList ↦ 1
+    [thm] List.length_nil ↦ 1
+    [thm] List.size_toArray ↦ 1
+    [thm] Vector.toArray_empty ↦ 1
+    [thm] codelen.eq_1 ↦ 1
+-/
+#guard_msgs in
+theorem yet_another : codelen [] = 0 := by grind [codelen]
+
 def stack : Type := List Int
 
 def config : Type := Int × stack × store
@@ -64,8 +108,23 @@ def config : Type := Int × stack × store
       transition C (pc , n2 :: n1 :: stk, s)
                    (pc', stk            , s)
 
-def transitions (C: List instr) : config -> config -> Prop :=
+@[grind] def transitions (C: List instr) : config → config → Prop :=
   star (transition C)
+/--
+error: tactic 'grind.cases' failed, (non-recursive) inductive type expected at c₂
+  config
+case grind
+C : List instr
+c₁ c₂ : config
+h : transitions C c₁ c₂
+h_1 : ¬star (transition C) c₁ c₂
+⊢ False
+-/
+#guard_msgs in
+theorem grind_weirdness : transitions C c₁ c₂ → (star (transition C)) c₁ c₂ := by
+  grind [transitions]
+
+
 
 def machine_terminates (C: List instr) (s_init: store) (s_final: store) : Prop :=
   exists pc, transitions C (0, [], s_init) (pc, [], s_final)
@@ -96,7 +155,7 @@ def compile_bexp (b: bexp) (d1: Int) (d0: Int) : List instr :=
       let code1 := compile_bexp b1 0 (codelen code2 + d0)
       code1 ++ code2
 
-def compile_com (c: com) : List instr:=
+@[grind] def compile_com (c: com) : List instr:=
   match c with
   | .SKIP =>
       []
@@ -133,6 +192,9 @@ def smart_Ibranch (d: Int) : List instr:=
 
 @[grind] theorem codelen_cons:
   forall i c, codelen (i :: c) = codelen c + 1 := by grind
+
+@[grind] theorem codelen_singleton : codelen [i] = 1 := by
+  dsimp [codelen]
 
 @[grind] theorem codelen_app:
   forall c1 c2, codelen (c1 ++ c2) = codelen c1 + codelen c2 := by
@@ -321,98 +383,97 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
               simp [codelen] at *
               grind
 
+theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : Int) (pc : Int) (stk : stack) (h : code_at C pc (compile_bexp b d1 d0))  :
+   transitions C
+       (pc, stk, s)
+       (pc + codelen (compile_bexp b d1 d0) + (if beval s b then d1 else d0), stk, s) := by
+    induction b generalizing d1 d0
+    next =>
+      simp [compile_bexp, beval]
+      by_cases d1 = 0
+      case pos is_zero =>
+        simp [is_zero, codelen]
+        apply star.star_refl
+      case neg is_not_zero =>
+        apply star_one
+        simp [is_not_zero, codelen]
+        apply transition.trans_branch _ _ _ d1
+        . simp [compile_bexp, is_not_zero] at h
+          have := @code_at_to_instr_at C pc [] (instr.Ibranch d1) [] (by grind [List.append_assoc, List.nil_append])
+          grind
+        . grind
+    next =>
+      simp [compile_bexp, beval]
+      by_cases d0 = 0
+      case pos is_zero =>
+        simp [is_zero, codelen]
+        apply star.star_refl
+      case neg is_not_zero =>
+        apply star_one
+        simp [is_not_zero, codelen]
+        apply transition.trans_branch _ _ _ d0
+        . simp [compile_bexp, is_not_zero] at h
+          have := @code_at_to_instr_at C pc [] (instr.Ibranch d0) [] (by grind [List.append_assoc, List.nil_append])
+          grind
+        . grind
+    next a1 a2 =>
+      simp [compile_bexp, beval]
+      apply star_trans
+      . apply compile_aexp_correct
+        rotate_left
+        . exact a1
+        . simp [compile_bexp] at h
+          grind
+      . apply star_trans
+        . apply compile_aexp_correct
+          rotate_right
+          . exact a2
+          . simp [compile_bexp] at h
+            grind
+        . apply star_one
+          . apply transition.trans_beq
+            rotate_left; rotate_left
+            . exact d1
+            . exact d0
+            . simp [compile_bexp] at h
+              grind
+            . grind
+    next a1 a2 =>
+      simp [compile_bexp, beval]
+      apply star_trans
+      . apply compile_aexp_correct
+        rotate_left
+        . exact a1
+        . simp [compile_bexp] at h
+          grind
+      . apply star_trans
+        . apply compile_aexp_correct
+          rotate_right
+          . exact a2
+          . simp [compile_bexp] at h
+            grind
+        . apply star_one
+          . apply transition.trans_ble
+            rotate_left; rotate_left
+            . exact d1
+            . exact d0
+            . simp [compile_bexp] at h
+              grind
+            . grind
+    next b1 ih =>
+      simp [compile_bexp, beval] at *
+      have := ih d0 d1 h
+      grind
+    next b1 b2 b1_ih b2_ih =>
+      simp [beval, compile_bexp]
+      simp [compile_bexp] at h
+      apply star_trans
+      . apply b1_ih 0 d0
+        . sorry
+      . sorry
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- - (* CONST *)
---   apply star_one. apply trans_const. eauto with code.
-
--- - (* VAR *)
---   apply star_one. apply trans_var. eauto with code.
-
--- - (* PLUS *)
---   eapply star_trans. apply IHa1. eauto with code.
---   eapply star_trans. apply IHa2. eauto with code.
---   apply star_one. autorewrite with code. apply trans_add. eauto with code.
-
--- - (* MINUS *)
---   eapply star_trans. apply IHa1. eauto with code.
---   eapply star_trans. apply IHa2. eauto with code.
---   eapply star_trans.
---   apply star_one. apply trans_opp. eauto with code.
---   apply star_one.
---   replace (aeval s a1 - aeval s a2)
---      with (aeval s a1 + (- aeval s a2))
---        by lia.
---   autorewrite with code. apply trans_add. eauto with code.
--- Qed.
-
--- (** The proof for the compilation of Boolean expressions is similar.
---   We recall the informal specification for the code generated by
---   [compile_bexp b d1 d0]: it should
--- - skip [d1] instructions if [b] evaluates to true,
---        [d0] if [b] evaluates to false
--- - leave the stack unchanged
--- - leave the store unchanged.
--- *)
-
--- Lemma compile_bexp_correct:
---   forall C s b d1 d0 pc stk,
---   code_at C pc (compile_bexp b d1 d0) ->
---   transitions C
---        (pc, stk, s)
---        (pc + codelen (compile_bexp b d1 d0) + (if beval s b then d1 else d0), stk, s).
--- Proof.
---   induction b; cbn; intros.
-
--- - (* TRUE *)
---   destruct (d1 =? 0) eqn:Z.
---   + (* distance is zero, no branch is generated *)
---     assert (d1 = 0) by (apply Z.eqb_eq; auto). subst d1.
---     autorewrite with code. apply star_refl.
---   + (* a branch is generated *)
---     apply star_one. apply trans_branch with (d := d1). eauto with code. auto.
-
--- - (* FALSE *)
---   destruct (d0 =? 0) eqn:Z.
---   + (* distance is zero, no branch is generated *)
---     assert (d0 = 0) by (apply Z.eqb_eq; auto). subst d0.
---     autorewrite with code. apply star_refl.
---   + (* a branch is generated *)
---     apply star_one. apply trans_branch with (d := d0). eauto with code. auto.
-
--- - (* EQUAL *)
---   eapply star_trans. apply compile_aexp_correct with (a := a1). eauto with code.
---   eapply star_trans. apply compile_aexp_correct with (a := a2). eauto with code.
---   apply star_one. apply trans_beq with (d1 := d1) (d0 := d0). eauto with code.
---   autorewrite with code. auto.
 
 -- - (* LESSEQUAL *)
 --   eapply star_trans. apply compile_aexp_correct with (a := a1). eauto with code.
@@ -439,14 +500,65 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
 
 -- (** ** 4.2 Correctness of generated code for commands, terminating case. *)
 
--- Lemma compile_com_correct_terminating:
---   forall s c s',
---   cexec s c s' ->
---   forall C pc stk,
---   code_at C pc (compile_com c) ->
---   transitions C
---       (pc, stk, s)
---       (pc + codelen (compile_com c), stk, s').
+theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s c s'):
+  ∀ C pc stk, code_at C pc (compile_com c) →
+  transitions C
+      (pc, stk, s)
+      (pc + codelen (compile_com c), stk, s') := by
+  induction c generalizing s s'
+  next =>
+    intro C pc stk h
+    unfold compile_com
+    dsimp [codelen]
+    simp only [Int.add_zero]
+    cases h₁
+    case cexec_skip =>
+      apply star.star_refl
+  next x a =>
+    intro C pc stk h
+    unfold compile_com
+    apply star_trans
+    . apply compile_aexp_correct
+      rotate_left
+      . exact a
+      . unfold compile_com at h
+        grind
+    . apply star_one
+      . have := @transition.trans_setvar C (pc + codelen (compile_aexp a)) stk s x (aeval s a)
+        rw [codelen_app, codelen_singleton]
+        suffices transition C (pc + codelen (compile_aexp a), aeval s a :: stk, s) (pc + codelen (compile_aexp a) + 1, stk, update x (aeval s a) s) from by grind
+        apply this
+        dsimp [compile_com] at h
+        grind
+  next c1 c2 c1_ih c2_ih =>
+    intro C pc stk h
+    cases h₁
+    case cexec_seq s' cexec1 cexec2 =>
+      rename_i s'2
+      apply star_trans
+      . apply c1_ih _ _ cexec1
+        dsimp [compile_com] at h
+        grind
+      . have := c2_ih _ _ cexec2 C (pc + codelen (compile_com c1)) stk
+        dsimp [compile_com]
+        suffices h : code_at C (pc + codelen (compile_com c1)) (compile_com c2) from by
+          specialize this h
+          rw [codelen_app]
+          unfold transitions at this
+          grind only
+        apply code_at_app_right
+        grind
+  next b c1 c2 c1_ih c2_ih =>
+    intro C pc stk
+    generalize heq1 : compile_com c1 = code1
+    generalize heq2 : compile_com c2 = code2
+    dsimp [compile_com]
+    rw [heq1, heq2]
+    sorry
+
+
+  any_goals sorry
+
 -- Proof.
 --   induction 1; cbn; intros.
 
