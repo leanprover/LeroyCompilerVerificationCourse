@@ -385,7 +385,7 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
    transitions C
        (pc, stk, s)
        (pc + codelen (compile_bexp b d1 d0) + (if beval s b then d1 else d0), stk, s) := by
-    induction b generalizing d1 d0
+    induction b generalizing d1 d0 pc
     next =>
       simp [compile_bexp, beval]
       by_cases d1 = 0
@@ -460,43 +460,41 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
             . grind
     next b1 ih =>
       simp [compile_bexp, beval] at *
-      have := ih d0 d1 h
+      have := ih d0 d1 pc
       grind
     next b1 b2 b1_ih b2_ih =>
-      simp [beval, compile_bexp]
-      simp [compile_bexp] at h
+      generalize heq1 : compile_bexp b2 d1 d0 = code2
+      generalize heq2 : compile_bexp b1 0 (codelen code2 + d0) = code1
+      unfold compile_bexp
+      simp [heq1, heq2]
       apply star_trans
-      . apply b1_ih 0 d0
-        . sorry
-      . sorry
-
-
-
-
--- - (* LESSEQUAL *)
---   eapply star_trans. apply compile_aexp_correct with (a := a1). eauto with code.
---   eapply star_trans. apply compile_aexp_correct with (a := a2). eauto with code.
---   apply star_one. apply trans_ble with (d1 := d1) (d0 := d0). eauto with code.
---   autorewrite with code. auto.
-
--- - (* NOT *)
---   replace (if negb (beval s b) then d1 else d0)
---      with (if beval s b then d0 else d1).
---   apply IHb. auto.
---   destruct (beval s b); auto.
-
--- - (* AND *)
---   set (code2 := compile_bexp b2 d1 d0) in *.
---   set (code1 := compile_bexp b1 0 (codelen code2 + d0)) in *.
---   eapply star_trans. apply IHb1. eauto with code.
---   fold code1. destruct (beval s b1); cbn.
---   + (* b1 evaluates to true, the code for b2 is executed *)
---     autorewrite with code. apply IHb2. eauto with code.
---   + (* b2 evaluates to true, the code for b2 is skipped *)
---     autorewrite with code. apply star_refl.
--- Qed.
-
--- (** ** 4.2 Correctness of generated code for commands, terminating case. *)
+      . apply b1_ih
+        rotate_left
+        . exact 0
+        . exact (codelen code2 + d0)
+        . rw [heq2]
+          unfold compile_bexp at h
+          simp [heq1, heq2] at h
+          apply code_at_app_left
+          exact h
+      . by_cases beval s b1 = true
+        case pos isTrue =>
+          simp [isTrue]
+          rw [heq2]
+          simp [beval, isTrue]
+          specialize b2_ih d1 d0 (pc + codelen code1)
+          rw [heq1] at b2_ih
+          simp [compile_bexp, heq1, heq2] at h
+          specialize b2_ih (by grind)
+          simp [codelen_app]
+          -- Why is grind not working here?
+          simp [Int.add_assoc] at *
+          exact b2_ih
+        case neg isFalse =>
+          simp [beval, isFalse]
+          rw [heq2]
+          simp [codelen_app]
+          grind
 
 theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s c s'):
   ∀ C pc stk, code_at C pc (compile_com c) →
@@ -546,16 +544,110 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
           grind only
         apply code_at_app_right
         grind
+  -- IFTHENELSE
   next b c1 c2 c1_ih c2_ih =>
     intro C pc stk
     generalize heq1 : compile_com c1 = code1
     generalize heq2 : compile_com c2 = code2
+    generalize heq3 : compile_bexp b 0 (codelen code1 + 1) = code3
     dsimp [compile_com]
-    rw [heq1, heq2]
-    sorry
+    rw [heq1, heq2, heq3]
+    intro h
+    apply star_trans
+    . have := compile_bexp_correct C s b 0 (codelen code1 + 1) pc stk (by grind)
+      apply this
+    . -- Now we look into two possible cases for branching
+      by_cases beval s b = true
+      case pos isTrue =>
+        -- The "then" branch is selected
+        simp [isTrue]
+        apply star_trans
+        . apply c1_ih
+          rotate_right
+          . exact s'
+          . cases h₁
+            next a =>
+              simp [isTrue] at a
+              exact a
+          . grind
+        . apply star_one
+          . apply transition.trans_branch
+            rotate_right
+            . exact codelen code2
+            . rw [heq3, heq1]
+              have := @code_at_to_instr_at C pc (code3 ++ code1) (instr.Ibranch (codelen code2)) code2 h
+              simp [codelen] at *
+              grind
+            . rw [heq3]
+              grind
+      case neg isFalse =>
+        rw [heq3]
+        simp [isFalse]
+        cases h₁
+        case cexec_ifthenelse a =>
+          simp [isFalse] at a
+          have := code_at_app_right C pc (code3 ++ code1 ++ [instr.Ibranch (codelen code2)]) code2 (by grind [List.cons_append, List.append_assoc, List.append_eq, List.nil_append])
+
+          specialize c2_ih s s' a C (pc + codelen code3 + codelen code1 + 1) stk (by grind)
+          rw [heq2] at c2_ih
+          simp [codelen_app, codelen_cons, codelen_singleton]
+          -- Grind completely fails here
+          have t1 : pc + codelen code3 + codelen code1 + 1 = pc + codelen code3 + (codelen code1 + 1) := by grind
+          have t2 : pc + codelen code3 + codelen code1 + 1 + codelen code2 = pc + (codelen code3 + (codelen code1 + (codelen code2 + 1))) := by grind
+          rw [← t1, ←t2]
+          apply c2_ih
+  next b c1 ih  =>
+    intro C pc stk
+    generalize heq1 : compile_com c1 = code_body
+    generalize heq2 : compile_bexp b 0 (codelen code_body + 1) = code_branch
+    generalize heq3 : - (codelen code_branch + codelen code_body + 1) = d
+    dsimp [compile_com]
+    rw[heq1, heq2, heq3]
+    cases h₁
+    case cexec_while_done isFalse =>
+      intro h
+      apply star_trans
+      . apply compile_bexp_correct C s b 0 (codelen code_body + 1) pc stk (by grind)
+      . simp [isFalse]
+        rw [heq2]
+        simp [codelen] at *
+        grind
+    case cexec_while_loop s_intermediate isTrue cexec1 cexec2 =>
+      intro h
+      apply star_trans
+      . apply compile_bexp_correct C s b 0 (codelen code_body + 1) pc stk (by grind)
+      . apply star_trans
+        . simp [isTrue]
+          rw [heq2]
+          specialize ih s s_intermediate cexec1 C (pc + codelen code_branch) stk
+          rw [heq1] at ih
+          apply ih
+          grind
+        . apply star_trans
+          . apply star_one
+            . apply transition.trans_branch
+              rotate_left
+              rotate_left
+              . exact d
+              . exact (pc + codelen code_branch + codelen code_body + 1 + d)
+              . apply @code_at_to_instr_at
+                rotate_left
+                . exact []
+                . apply code_at_app_right
+                  grind [List.append_assoc]
+              . grind
+          . specialize ih
+            sorry
 
 
-  any_goals sorry
+
+
+
+
+
+
+
+
 
 -- Proof.
 --   induction 1; cbn; intros.

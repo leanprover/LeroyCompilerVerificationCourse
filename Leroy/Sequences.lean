@@ -31,6 +31,40 @@ theorem cycle_infseq {R : α → α → Prop} (x : α) : R x x → infseq R x :=
   | star_refl : ∀ x : α, star R x x
   | star_step : ∀ x y z, R x y → star R y z → star R x z
 
+def star2 (R : α → α → Prop) (m n : α) : Prop :=
+  m = n ∨ ∃ middle, R m middle ∧ star2 R middle n
+least_fixpoint
+
+theorem star2_star (R : α → α → Prop) (m n : α) : star2 R m n → star R m n
+:= by
+  have := @star2.fixpoint_induct _ R n (fun x => star R x n)
+  apply this
+  intro m
+  intro h
+  cases h
+  case y.inl eq =>
+    rw [eq]
+    apply star.star_refl
+  case y.inr h =>
+    apply Exists.elim h
+    intro middle
+    intro ⟨h₁, h₂⟩
+    apply star.star_step
+    exact h₁
+    exact h₂
+
+theorem star_star2 (R : α → α → Prop) (m n : α) : star R m n → star2 R m n := by
+  intro h
+  induction h
+  case star_refl =>
+    rw [star2]
+    left
+    rfl
+  case star_step x y z rel h₁ h₂ =>
+    rw [star2]
+    right
+    exists y
+
 @[grind] theorem star_one (R : α → α → Prop) : ∀ a b : α, R a b → star R a b := by
   intros a b Rab
   apply star.star_step
@@ -63,7 +97,7 @@ theorem plus_one : ∀ a b, R a b → plus R a b := by
     case plus_left h₁ h₂ h₃ =>
       grind [star.star_step]
 
-@[grind]theorem plus_star_trans (R : α → α → Prop)  : ∀ (a b c : α), star R a b → plus R b c → plus R a c := by
+@[grind] theorem plus_star_trans (R : α → α → Prop) : ∀ (a b c : α), star R a b → plus R b c → plus R a c := by
   intro a b c s p
   induction s
   any_goals grind
@@ -80,7 +114,7 @@ def infseq_if_all_seq_inf (R : α → α → Prop) : ∀ x, all_seq_inf R x → 
   intro x H
   apply Exists.elim (H x (by simp only [star.star_refl]))
   intro y Rxy
-  apply Exists.intro y
+  exists y
   constructor
   . exact Rxy
   . intro y' Ryy'
@@ -97,7 +131,7 @@ theorem infseq_coinduction_principle_2:
     case x =>
       apply Exists.elim (h₁ a rel)
       intro a' _
-      apply Exists.intro a'
+      exists a'
       grind
     case y =>
       intro a0 h₂
