@@ -496,6 +496,142 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
           simp [codelen_app]
           grind
 
+theorem compile_com_correct_terminating' (s s' : store) (c : com) (h₁ : cexec s c s') :
+ ∀ C pc stk, code_at C pc (compile_com c) →
+  transitions C
+      (pc, stk, s)
+      (pc + codelen (compile_com c), stk, s') := by
+  induction h₁
+  case cexec_skip =>
+    intro C pc stk h
+    unfold compile_com
+    dsimp [codelen]
+    simp only [Int.add_zero]
+    apply star.star_refl
+  case cexec_assign s' x a =>
+    intro C pc stk h
+    unfold compile_com
+    apply star_trans
+    . apply compile_aexp_correct
+      rotate_left
+      . exact a
+      . unfold compile_com at h
+        grind
+    . apply star_one
+      . have := @transition.trans_setvar C (pc + codelen (compile_aexp a)) stk s x (aeval s a)
+        rw [codelen_app, codelen_singleton]
+        suffices transition C (pc + codelen (compile_aexp a), aeval s a :: stk, s) (pc + codelen (compile_aexp a) + 1, stk, update x (aeval s a) s) from by grind
+        apply this
+        grind
+  case cexec_seq s'2 c1 s1 c2 s2 cexec1 cexec2 c1_ih c2_ih =>
+    intro C pc stk h
+    apply star_trans
+    . apply c1_ih
+      unfold compile_com at h
+      apply code_at_app_left
+      exact h
+    . specialize c2_ih C (pc + codelen (compile_com c1)) stk
+      simp [compile_com, codelen_app, Int.add_assoc]
+      simp [Int.add_assoc] at c2_ih
+      apply c2_ih
+      grind
+  case cexec_ifthenelse s b c1 c2 s' cexec_h ih =>
+    intro C pc stk
+    generalize heq1 : compile_com c1 = code1
+    generalize heq2 : compile_com c2 = code2
+    generalize heq3 : compile_bexp b 0 (codelen code1 + 1) = code3
+    simp [compile_com]
+    rw [heq1, heq2, heq3]
+    intro h
+    apply star_trans
+    . have := compile_bexp_correct C s b 0 (codelen code1 + 1) pc stk (by grind)
+      apply this
+    . by_cases beval s b = true
+      case pos isTrue =>
+        -- The "then" branch is selected
+        simp [isTrue]
+        apply star_trans
+        . apply ih
+          simp [isTrue, heq1, heq3]
+          grind
+        . apply star_one
+          . apply transition.trans_branch
+            rotate_right
+            . exact codelen code2
+            . simp [isTrue]
+              rw [heq3, heq1]
+              have := @code_at_to_instr_at C pc (code3 ++ code1) (instr.Ibranch (codelen code2)) code2 (by grind)
+              simp [codelen] at *
+              grind
+            . rw [heq3]
+              grind
+      case neg isFalse =>
+        simp [isFalse]
+        rw [heq3]
+        specialize ih C (pc + codelen code3 + (codelen code1 + 1)) stk
+        simp [isFalse] at ih
+        suffices h2 : code_at C (pc + codelen code3 + (codelen code1 + 1)) (compile_com c2) from by
+          specialize ih h2
+          simp [codelen_app, codelen_cons]
+          -- grind is failing here
+          have : (pc + codelen code3 + (codelen code1 + 1) + codelen (compile_com c2)) = (pc + (codelen code3 + (codelen code1 + (codelen code2 + 1)))) := by grind
+          rw [this] at ih
+          apply ih
+        -- In the last argument grind fails
+        have := @code_at_app_right C pc (code3 ++ code1 ++ [instr.Ibranch (codelen code2)]) code2 (by simp[h])
+        simp [codelen_app, codelen_singleton] at this
+        rw [heq2]
+        grind
+  case cexec_while_done s b c1 isFalse =>
+    intro C pc stk h
+    generalize heq1 : compile_com c1 = code_body
+    generalize heq2 : compile_bexp b 0 (codelen code_body + 1) = code_branch
+    generalize heq3 : - (codelen code_branch + codelen code_body + 1) = d
+    simp [compile_com]
+    rw [heq1, heq2, heq3]
+    simp [codelen_app, codelen_singleton]
+    apply star_trans
+    .  apply compile_bexp_correct C s b 0 (codelen code_body + 1) pc stk (by grind)
+    . simp [isFalse]
+      grind
+  case cexec_while_loop s b c1 s_intermediate s' isTrue cexec1 cexec2 ih1 ih2 =>
+    intro C pc stk
+    generalize heq1 : compile_com c1 = code_body
+    generalize heq2 : compile_bexp b 0 (codelen code_body + 1) = code_branch
+    generalize heq3 : - (codelen code_branch + codelen code_body + 1) = d
+    simp [compile_com]
+    rw [heq1, heq2, heq3]
+    intro h
+    apply star_trans
+    . apply compile_bexp_correct C s b 0 (codelen code_body + 1) pc stk (by grind)
+    . apply star_trans
+      . simp [isTrue]
+        rw [heq2]
+        specialize ih1 C (pc + codelen code_branch) stk
+        apply ih1
+        grind
+      . apply star_trans
+        . apply star_one
+          apply transition.trans_branch
+          rotate_left
+          rotate_left
+          . exact d
+          . exact (pc + codelen code_branch + codelen code_body + 1 + d)
+          . apply @code_at_to_instr_at
+            rotate_left
+            . exact []
+            . apply code_at_app_right
+              grind [List.append_assoc]
+          . grind
+        . specialize ih2 C (pc + codelen code_branch + codelen code_body + 1 + d) stk
+          suffices h2 : code_at C (pc + codelen code_branch + codelen code_body + 1 + d) (compile_com (com.WHILE b c1)) from by
+            specialize ih2 h2
+            simp [compile_com] at ih2
+            rw [heq1, heq2] at ih2
+
+            sorry
+          sorry
+
 theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s c s'):
   ∀ C pc stk, code_at C pc (compile_com c) →
   transitions C
@@ -724,50 +860,8 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
 -- - eauto with code.
 -- Qed.
 
--- (** *** Exercise (2 stars, recommended). *)
 
--- (** In a previous exercise, you modified [compile_com] to use
---   [smart_Ibranch] instead of [Ibranch] so as to generate better code.
---   Adapt the proof of [compile_com_correct_terminating] accordingly.
---   Hint: first prove the following lemma, then use it! *)
 
--- Lemma transitions_smart_Ibranch:
---   forall C pc d pc' stk s,
---   code_at C pc (smart_Ibranch d) ->
---   pc' = pc + 1 + d ->
---   transitions C (pc, stk, s) (pc', stk, s).
--- Proof.
---   unfold smart_Ibranch; intros.
---   (* FILL IN HERE *)
--- Abort.
-
--- (** *** Exercise (4 stars, optional). *)
-
--- (** Consider a loop with a simple test, such as [WHILE (LESSEQUAL a1 a2) c].
---   Currently, the compiled code executes two branch instructions per iteration
---   of the loop: one [Ible] to test the condition and one [Ibranch] to go back to
---   the beginning of the loop.  We can reduce this to one [Ible] instruction
---   per iteration, by putting the code for [c] before the code for the test:
--- <<
---      compile_com c ++ compile_bexp b delta1 0
--- >>
---   with [delta1] chosen so as to branch back to the beginning of [compile_com c]
---   when [b] is true.
-
---   By itself, this would compile while loops like do-while loops, which is
---   incorrect.  On the first iteration, we must skip over the code for [c]
---   and branch to the code that tests [b]:
--- <<
---     Ibranch (codesize(compile_com c)) :: compile_com c ++ compile_bexp b delta1 0
--- >>
---   In this exercise, you should modify [compile_com] to implement this
---   alternate compilation schema for loops, then show its correctness
---   by updating the statement and proof of [compile_com_correct_terminating].
---   The difficulty (and the reason for the 4 stars) is that the hypothesis
---   [code_at C pc (compile_com c)] no longer holds if [c] is a while loop
---   and we are at the second iteration of the loop.  You need to come up
---   with a more flexible way to relate the command [c] and the PC.
--- *)
 
 -- (** * 7.  Full proof of compiler correctness *)
 
