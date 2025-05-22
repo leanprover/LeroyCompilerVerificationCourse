@@ -496,7 +496,7 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
           simp [codelen_app]
           grind
 
-theorem compile_com_correct_terminating' (s s' : store) (c : com) (h₁ : cexec s c s') :
+theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s c s') :
  ∀ C pc stk, code_at C pc (compile_com c) →
   transitions C
       (pc, stk, s)
@@ -627,241 +627,21 @@ theorem compile_com_correct_terminating' (s s' : store) (c : com) (h₁ : cexec 
           suffices h2 : code_at C (pc + codelen code_branch + codelen code_body + 1 + d) (compile_com (com.WHILE b c1)) from by
             specialize ih2 h2
             simp [compile_com] at ih2
-            rw [heq1, heq2] at ih2
-
-            sorry
-          sorry
-
-theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s c s'):
-  ∀ C pc stk, code_at C pc (compile_com c) →
-  transitions C
-      (pc, stk, s)
-      (pc + codelen (compile_com c), stk, s') := by
-  induction c generalizing s s'
-  next =>
-    intro C pc stk h
-    unfold compile_com
-    dsimp [codelen]
-    simp only [Int.add_zero]
-    cases h₁
-    case cexec_skip =>
-      apply star.star_refl
-  next x a =>
-    intro C pc stk h
-    unfold compile_com
-    apply star_trans
-    . apply compile_aexp_correct
-      rotate_left
-      . exact a
-      . unfold compile_com at h
-        grind
-    . apply star_one
-      . have := @transition.trans_setvar C (pc + codelen (compile_aexp a)) stk s x (aeval s a)
-        rw [codelen_app, codelen_singleton]
-        suffices transition C (pc + codelen (compile_aexp a), aeval s a :: stk, s) (pc + codelen (compile_aexp a) + 1, stk, update x (aeval s a) s) from by grind
-        apply this
-        dsimp [compile_com] at h
-        grind
-  next c1 c2 c1_ih c2_ih =>
-    intro C pc stk h
-    cases h₁
-    case cexec_seq s' cexec1 cexec2 =>
-      rename_i s'2
-      apply star_trans
-      . apply c1_ih _ _ cexec1
-        dsimp [compile_com] at h
-        grind
-      . have := c2_ih _ _ cexec2 C (pc + codelen (compile_com c1)) stk
-        dsimp [compile_com]
-        suffices h : code_at C (pc + codelen (compile_com c1)) (compile_com c2) from by
-          specialize this h
-          rw [codelen_app]
-          unfold transitions at this
-          grind only
-        apply code_at_app_right
-        grind
-  -- IFTHENELSE
-  next b c1 c2 c1_ih c2_ih =>
-    intro C pc stk
-    generalize heq1 : compile_com c1 = code1
-    generalize heq2 : compile_com c2 = code2
-    generalize heq3 : compile_bexp b 0 (codelen code1 + 1) = code3
-    dsimp [compile_com]
-    rw [heq1, heq2, heq3]
-    intro h
-    apply star_trans
-    . have := compile_bexp_correct C s b 0 (codelen code1 + 1) pc stk (by grind)
-      apply this
-    . -- Now we look into two possible cases for branching
-      by_cases beval s b = true
-      case pos isTrue =>
-        -- The "then" branch is selected
-        simp [isTrue]
-        apply star_trans
-        . apply c1_ih
-          rotate_right
-          . exact s'
-          . cases h₁
-            next a =>
-              simp [isTrue] at a
-              exact a
-          . grind
-        . apply star_one
-          . apply transition.trans_branch
-            rotate_right
-            . exact codelen code2
-            . rw [heq3, heq1]
-              have := @code_at_to_instr_at C pc (code3 ++ code1) (instr.Ibranch (codelen code2)) code2 h
-              simp [codelen] at *
-              grind
-            . rw [heq3]
-              grind
-      case neg isFalse =>
-        rw [heq3]
-        simp [isFalse]
-        cases h₁
-        case cexec_ifthenelse a =>
-          simp [isFalse] at a
-          have := code_at_app_right C pc (code3 ++ code1 ++ [instr.Ibranch (codelen code2)]) code2 (by grind [List.cons_append, List.append_assoc, List.append_eq, List.nil_append])
-
-          specialize c2_ih s s' a C (pc + codelen code3 + codelen code1 + 1) stk (by grind)
-          rw [heq2] at c2_ih
-          simp [codelen_app, codelen_cons, codelen_singleton]
-          -- Grind completely fails here
-          have t1 : pc + codelen code3 + codelen code1 + 1 = pc + codelen code3 + (codelen code1 + 1) := by grind
-          have t2 : pc + codelen code3 + codelen code1 + 1 + codelen code2 = pc + (codelen code3 + (codelen code1 + (codelen code2 + 1))) := by grind
-          rw [← t1, ←t2]
-          apply c2_ih
-  next b c1 ih  =>
-    intro C pc stk
-    generalize heq1 : compile_com c1 = code_body
-    generalize heq2 : compile_bexp b 0 (codelen code_body + 1) = code_branch
-    generalize heq3 : - (codelen code_branch + codelen code_body + 1) = d
-    dsimp [compile_com]
-    rw[heq1, heq2, heq3]
-    cases h₁
-    case cexec_while_done isFalse =>
-      intro h
-      apply star_trans
-      . apply compile_bexp_correct C s b 0 (codelen code_body + 1) pc stk (by grind)
-      . simp [isFalse]
-        rw [heq2]
-        simp [codelen] at *
-        grind
-    case cexec_while_loop s_intermediate isTrue cexec1 cexec2 =>
-      intro h
-      apply star_trans
-      . apply compile_bexp_correct C s b 0 (codelen code_body + 1) pc stk (by grind)
-      . apply star_trans
-        . simp [isTrue]
-          rw [heq2]
-          specialize ih s s_intermediate cexec1 C (pc + codelen code_branch) stk
-          rw [heq1] at ih
-          apply ih
+            rw [heq1, heq2, heq3] at ih2
+            simp [codelen_app]
+            simp [codelen_app] at ih2
+            -- grind is not managing to solve the arithmetic goal here
+            have : (pc + codelen code_branch + codelen code_body + 1 + d +
+      (codelen code_branch + (codelen code_body + codelen [instr.Ibranch d])) ) = (pc + (codelen code_branch + (codelen code_body + codelen [instr.Ibranch d]))) := by grind
+            rw [←this]
+            apply ih2
+          rw [←heq3]
+          suffices h3 : (pc + codelen code_branch + codelen code_body + 1 + -(codelen code_branch + codelen code_body + 1)) = pc from by
+            rw [h3]
+            simp [compile_com]
+            rw [heq1, heq2, heq3]
+            exact h
           grind
-        . apply star_trans
-          . apply star_one
-            . apply transition.trans_branch
-              rotate_left
-              rotate_left
-              . exact d
-              . exact (pc + codelen code_branch + codelen code_body + 1 + d)
-              . apply @code_at_to_instr_at
-                rotate_left
-                . exact []
-                . apply code_at_app_right
-                  grind [List.append_assoc]
-              . grind
-          . specialize ih
-            sorry
-
-
-
-
-
-
-
-
-
-
-
--- Proof.
---   induction 1; cbn; intros.
-
--- - (* SKIP *)
---   autorewrite with code. apply star_refl.
-
--- - (* ASSIGN *)
---   eapply star_trans. apply compile_aexp_correct with (a := a). eauto with code.
---   apply star_one. autorewrite with code. apply trans_setvar. eauto with code.
-
--- - (* SEQUENCE *)
---   eapply star_trans.
---   apply IHcexec1. eauto with code.
---   autorewrite with code. apply IHcexec2. eauto with code.
-
--- - (* IFTHENELSE *)
---   set (code1 := compile_com c1) in *.
---   set (code2 := compile_com c2) in *.
---   set (codeb := compile_bexp b 0 (codelen code1 + 1)) in *.
---   eapply star_trans.
---   apply compile_bexp_correct with (b := b). eauto with code.
---   fold codeb. destruct (beval s b); autorewrite with code.
---   + (* the "then" branch is selected *)
---     eapply star_trans. apply IHcexec. eauto with code.
---     fold code1. apply star_one. apply trans_branch with (d := codelen code2). eauto with code. lia.
---   + (* then "else" branch is selected *)
---     replace (pc + codelen codeb + codelen code1 + codelen code2 + 1)
---        with (pc + codelen codeb + codelen code1 + 1 + codelen code2) by lia.
---     apply IHcexec. eauto with code.
-
--- - (* WHILE stop *)
---   set (code_body := compile_com c) in *.
---   set (code_branch := compile_bexp b 0 (codelen code_body + 1)) in *.
---   set (d := - (codelen code_branch + codelen code_body + 1)) in *.
---   eapply star_trans. apply compile_bexp_correct with (b := b). eauto with code.
---   rewrite H. fold code_branch. autorewrite with code. apply star_refl.
-
--- - (* WHILE loop *)
---   set (code_body := compile_com c) in *.
---   set (code_branch := compile_bexp b 0 (codelen code_body + 1)) in *.
---   set (d := - (codelen code_branch + codelen code_body + 1)) in *.
---   eapply star_trans. apply compile_bexp_correct with (b := b). eauto with code.
---   rewrite H. fold code_branch. autorewrite with code.
---   eapply star_trans. apply IHcexec1. eauto with code.
---   eapply star_trans.
---   apply star_one. apply trans_branch with (d := d). eauto with code. eauto.
---   replace (pc + codelen code_branch + codelen code_body + 1 + d)
---      with pc
---        by lia.
---   replace (pc + codelen code_branch + codelen code_body + 1)
---      with (pc + codelen (compile_com (WHILE b c)))
---        by (cbn; autorewrite with code; auto).
---   apply IHcexec2. auto.
--- Qed.
-
--- (** As a corollary, we obtain the correctness of the compilation of whole
---   programs, assuming they terminate. *)
-
--- Theorem compile_program_correct_terminating:
---   forall s c s',
---   cexec s c s' ->
---   machine_terminates (compile_program c) s s'.
--- Proof.
---   intros.
---   set (C := compile_program c).
---   assert (CODEAT: code_at C 0 (compile_com c ++ Ihalt :: nil)).
---   { replace C with (nil ++ compile_program c ++ nil).
---     apply code_at_intro. auto.
---     rewrite app_nil_r; auto. }
---   unfold machine_terminates.
---   exists (0 + codelen (compile_com c)); split.
--- - apply compile_com_correct_terminating. auto. eauto with code.
--- - eauto with code.
--- Qed.
-
-
-
 
 -- (** * 7.  Full proof of compiler correctness *)
 
