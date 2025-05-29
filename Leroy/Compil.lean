@@ -743,10 +743,10 @@ theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont)
     generalize h₁ : (cont.Kwhile b c k) = a₁
     generalize h₂ : pc = a₂
     rw [h₁, h₂] at H
-    induction H generalizing pc
+    induction H generalizing pc k
     any_goals grind
     case ccont_branch d k' pc₂ pc₃ h₃ h₄ h₅ ih =>
-      specialize ih pc₃ h₁ rfl
+      specialize ih k pc₃ h₁ rfl
       apply Exists.elim ih
       intro pc₄ ih
       exists pc₄
@@ -765,24 +765,13 @@ theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont)
             exact h₃
       . grind
     case ccont_while b' c' k' pc₂ d pc₃ pc₄ h₃ h₄ h₅ h₆ h₇ ih =>
-      sorry
-
-
-
-
-
-
-
-
-
--- Proof.
---   intros. dependent induction H.
--- - exists (pc + 1 + d); split.
---   apply plus_one. eapply trans_branch; eauto.
---   split; congruence.
--- - edestruct IHcompile_cont as (pc'' & A & B & D). eauto.
---   exists pc''; split; auto. eapply plus_left. eapply trans_branch; eauto. apply plus_star; auto.
--- Qed.
+      exists (pc + 1 + d)
+      constructor
+      apply plus_one
+      apply transition.trans_branch
+      rotate_left 2
+      . exact d
+      any_goals grind
 
 theorem match_config_skip (C : List instr) (k : cont) (s : store) (pc : Int) (H: compile_cont C k pc):
  match_config C (.SKIP, k, s) (pc, [], s) := by
@@ -971,50 +960,6 @@ theorem simulation_step:
           . exact w₂.1
           . exact w₂.2
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- (** At last, we can state and prove the simulation diagram. *)
-
--- Lemma simulation_step:
---   forall C impconf1 impconf2 machconf1,
---   step impconf1 impconf2 ->
---   match_config C impconf1 machconf1 ->
---   exists machconf2,
---       (plus (transition C) machconf1 machconf2
---        \/ (star (transition C) machconf1 machconf2
---            /\ (measure impconf2 < measure impconf1)%nat))
---    /\ match_config C impconf2 machconf2.
--- Proof.
---   intros until machconf1; intros STEP MATCH.
---   inversion STEP; clear STEP; subst; inversion MATCH; clear MATCH; subst; cbn in *.
-
-
-
--- - (* skip while *)
---   autorewrite with code in *.
---   edestruct compile_cont_Kwhile_inv as (pc' & X & Y & Z). eauto.
---   econstructor; split.
---   left. eauto.
---   constructor; auto.
--- Qed.
 
 -- (** The hard work is done!  Nice consequences will follow. *)
 
