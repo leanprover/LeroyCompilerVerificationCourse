@@ -573,7 +573,7 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
             rw [heq1, heq2, heq3] at ih2
             simp [codelen_app]
             simp [codelen_app] at ih2
-            -- grind is not managing to solve the arithmetic goal here
+
             have : (pc + codelen code_branch + codelen code_body + 1 + d +
       (codelen code_branch + (codelen code_body + codelen [instr.Ibranch d])) ) = (pc + (codelen code_branch + (codelen code_body + codelen [instr.Ibranch d]))) := by grind
             rw [←this]
@@ -585,35 +585,6 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
             rw [heq1, heq2, heq3]
             exact h
           grind
-
--- (** * 7.  Full proof of compiler correctness *)
-
--- (** We would like to strengthen the correctness result above so that it
---   is not restricted to terminating source programs, but also applies to
---   source program that diverge.  To this end, we abandon the big-step
---   semantics for commands and switch to the small-step semantics with
---   continuations.  We then show a simulation theorem, establishing that
---   every transition of the small-step semantics in the source program
---   is simulated (in a sense to be made precise below) by zero, one or
---   several transitions of the machine executing the compiled code for
---   the source program. *)
-
--- (** Our first task is to relate configurations [(c, k, s)] of the small-step
---   semantics with configurations [(C, pc, stk, s)] of the machine.
---   We already know how to relate a command [c] with the machine code,
---   using the [codeseq_at] predicate.  What needs to be defined is a relation
---   between the continuation [k] and the machine code.
-
---   Intuitively, when the machine finishes executing the generated code for
---   command [c], that is, when it reaches the program point
---   [pc + length(compile_com c)], the machine should continue by executing
---   instructions that perform the pending computations described by
---   continuation [k], then reach an [Ihalt] instruction to stop cleanly.
-
---   We formalize this intution by the following inductive predicate
---   [compile_cont C k pc], which states that, starting at program point [pc],
---   there are instructions that perform the computations described in [k]
---   and reach an [Ihalt] instruction. *)
 
 inductive compile_cont (C: List instr) : cont -> Int -> Prop where
   | ccont_stop: forall pc,
@@ -637,51 +608,11 @@ inductive compile_cont (C: List instr) : cont -> Int -> Prop where
       compile_cont C k pc' ->
       compile_cont C k pc
 
--- (** Then, a configuration [(c,k,s)] of the small-step semantics matches
---   a configuration [(C, pc, stk, s')] of the machine if the following conditions hold:
--- - The stores are identical: [s' = s].
--- - The machine stack is empty: [stk = nil].
--- - The machine code at point [pc] is the compiled code for [c]:
---   [code_at C pc (compile_com c)].
--- - The machine code at point [pc + codelen (compile_com c)] matches continuation
---   [k], in the sense of [compile_cont] above.
--- *)
 inductive match_config (C: List instr): com × cont × store -> config -> Prop where
   | match_config_intro: forall c k st pc,
       code_at C pc (compile_com c) ->
       compile_cont C k (pc + codelen (compile_com c)) ->
       match_config C (c, k, st) (pc, [], st)
-
--- (** We are now ready to prove the expected simulation property.
---   Since some transitions in the source command correspond to zero transitions
---   in the compiled code, we need a simulation diagram of the "star" kind
---   (see the slides).
--- <<
---                       match_config
---      c / k / st  ----------------------- machconfig
---        |                                   |
---        |                                   | + or ( * and |c',k'| < |c,k} )
---        |                                   |
---        v                                   v
---     c' / k' / st' ----------------------- machconfig'
---                       match_config
--- >>
--- Note the stronger conclusion on the right:
--- - either the virtual machine does one or several transitions
--- - or it does zero, one or several transitions, but the size of the [c,k]
---   pair decreases strictly.
-
--- It would be equivalent to state:
--- - either the virtual machine does one or several transitions
--- - or it does zero transitions, but the size of the [c,k] pair decreases strictly.
-
--- However, the formulation above, with the "star" case, is often more convenient.
--- *)
-
--- (** Finding an appropriate "anti-stuttering" measure is a bit of a black art.
---   After trial and error, we find that the following measure works.  It is
---   the sum of the sizes of the command [c] under focus and all the commands
---   appearing in the continuation [k]. *)
 
 def com_size (c: com) : Nat :=
   match c with
@@ -967,73 +898,109 @@ theorem simulation_step:
 --   using the continuation semantics instead of the big-step semantics
 --   to characterize termination of the source program. *)
 
--- Lemma simulation_steps:
---   forall C impconf1 impconf2, star step impconf1 impconf2 ->
---   forall machconf1, match_config C impconf1 machconf1 ->
---   exists machconf2,
---      star (transition C) machconf1 machconf2
---   /\ match_config C impconf2 machconf2.
--- Proof.
---   induction 1; intros.
--- - exists machconf1; split; auto. apply star_refl.
--- - edestruct simulation_step as (machconf2 & STEPS2 & MATCH2); eauto.
---   edestruct IHstar as (machconf3 & STEPS3 & MATCH3); eauto.
---   exists machconf3; split; auto.
---   eapply star_trans; eauto.
---   destruct STEPS2 as [A | [A B]]. apply plus_star; auto. auto.
--- Qed.
+theorem simulation_steps:
+  forall C impconf1 impconf2, star step impconf1 impconf2 ->
+  forall machconf1, match_config C impconf1 machconf1 ->
+  exists machconf2,
+     star (transition C) machconf1 machconf2
+  /\ match_config C impconf2 machconf2 := by
+      intro C impconf1 impconf2 STAR machconf1 MATCH
+      induction STAR generalizing machconf1
+      case star_refl x =>
+        exists machconf1
+        constructor
+        . apply star.star_refl
+        . exact MATCH
+      case star_step x y z STEP STAR ih =>
+        have ⟨ machconf2, steps2, match2 ⟩ := simulation_step C x y machconf1 STEP MATCH
+        specialize ih machconf2 match2
+        rcases ih with ⟨ machconf3, steps3, match3⟩
+        exists machconf3
+        have w : star (transition C) machconf1 machconf2 := by
+          cases steps2
+          case inl h =>
+            apply plus_star
+            exact h
+          case inr h =>
+            exact h.1
+        constructor
+        . apply star_trans
+          . exact w
+          . exact steps3
+        . exact match3
 
--- Lemma match_initial_configs:
---   forall c s,
---   match_config (compile_program c) (c, Kstop, s) (0, nil, s).
--- Proof.
---   intros. set (C := compile_program c).
---   assert (code_at C 0 (compile_com c ++ Ihalt :: nil)).
---   { replace C with (nil ++ (compile_com c ++ Ihalt :: nil) ++ nil).
---     constructor; auto.
---     rewrite app_nil_r; auto. }
---   constructor.
--- - eauto with code.
--- - apply ccont_stop. eauto with code.
--- Qed.
+theorem instr_at_len : instr_at (C ++ [i]) (codelen C) = .some i := by
+  induction C
+  any_goals grind
 
--- Theorem compile_program_correct_terminating_2:
---   forall c s s',
---   star step (c, Kstop, s) (SKIP, Kstop, s') ->
---   machine_terminates (compile_program c) s s'.
--- Proof.
---   intros. set (C := compile_program c).
---   edestruct (simulation_steps C) as (ms & A & B). eauto. apply match_initial_configs.
---   inversion B; subst.
---   edestruct compile_cont_Kstop_inv as (pc' & D & E). eauto.
---   exists pc'; split; auto.
---   eapply star_trans. eauto. cbn in D; autorewrite with code in D. eauto.
--- Qed.
+
+theorem match_initial_configs:
+  forall c s,
+  match_config (compile_program c) (c, .Kstop, s) (0, [], s) := by
+    intro c s
+    generalize heq : compile_com c = C
+    constructor
+    . simp [compile_program]
+      have := code_at.code_at_intro [] C [instr.Ihalt] 0 (by simp [codelen])
+      grind [List.nil_append]
+    . simp [compile_program, heq]
+      constructor
+      grind [instr_at_len]
+
+theorem compile_program_correct_terminating_2:
+  forall c s s',
+  star step (c, .Kstop, s) (.SKIP, .Kstop, s') ->
+  machine_terminates (compile_program c) s s' := by
+    intro c s s' STAR
+    generalize heq : compile_program c = C
+    have ⟨ ms, A, B ⟩ := simulation_steps C (c, cont.Kstop, s) (com.SKIP, cont.Kstop, s') STAR (0, [], s) (by grind [match_initial_configs])
+    cases B
+    case match_config_intro pc w1 w2 =>
+      have ⟨pc', D, E ⟩ := compile_cont_Kstop_inv C (pc + codelen (compile_com com.SKIP)) s' w2
+      exists pc'
+      constructor
+      . apply star_trans
+        . exact A
+        . simp [compile_com, codelen] at D
+          exact D
+      . exact E
 
 -- (** Second, and more importantly, we get a proof of semantic preservation
 --   for diverging source programs: if the program makes infinitely many steps,
 --   the generated code makes infinitely many machine transitions. *)
 
--- Lemma simulation_infseq_inv:
---   forall C n impconf1 machconf1,
---   infseq step impconf1 -> match_config C impconf1 machconf1 ->
---   (measure impconf1 < n)%nat ->
---   exists impconf2 machconf2,
---       infseq step impconf2
---    /\ plus (transition C) machconf1 machconf2
---    /\ match_config C impconf2 machconf2.
--- Proof.
---   induction n; intros impconf1 machconf1 INFSEQ MATCH MEASURE.
--- - exfalso; lia.
--- - inversion INFSEQ; clear INFSEQ; subst.
---   edestruct simulation_step as (machconf2 & [PLUS | [STAR LESS]] & MATCH2). eauto. eauto.
--- + exists b, machconf2; auto.
--- + edestruct IHn as (impconf3 & machconf3 & X & Y & Z). eauto. eauto. lia.
---   exists impconf3, machconf3.
---   split. auto.
---   split. eapply star_plus_trans; eauto.
---   auto.
--- Qed.
+theorem simulation_infseq_inv:
+  forall C n impconf1 machconf1,
+  infseq step impconf1 -> match_config C impconf1 machconf1 ->
+  (measure' impconf1 < n) ->
+  exists impconf2 machconf2,
+      infseq step impconf2
+   /\ plus (transition C) machconf1 machconf2
+   /\ match_config C impconf2 machconf2 := by
+    intro C n impconf1 h1 h2 h3 h4
+    induction n generalizing impconf1 h1
+    case zero => contradiction
+    case succ n' ih =>
+      rw [infseq] at h2
+      rcases h2 with ⟨impconf2 , STEP, INFSEQ⟩
+      have ⟨ machconf2, h5 , h6 ⟩ := simulation_step C impconf1 impconf2 h1 STEP h3
+      cases h5
+      next PLUS =>
+        exists impconf2
+        exists machconf2
+      next w =>
+        rcases w with ⟨ STAR, MEASURE ⟩
+        specialize ih impconf2 machconf2 INFSEQ h6 (by omega)
+        rcases ih with ⟨ c1, m1, w⟩
+        exists c1
+        exists m1
+        constructor
+        . exact w.1
+        . constructor
+          . apply star_plus_trans
+            . exact STAR
+            . exact w.2.1
+          . exact w.2.2
 
 -- Theorem compile_program_correct_diverging:
 --   forall c s,
