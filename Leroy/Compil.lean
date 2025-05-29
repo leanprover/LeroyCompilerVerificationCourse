@@ -886,7 +886,7 @@ theorem simulation_step:
             case neg isFalse =>
               simp [isFalse] at *
               grind
-      case mk.mk.step_while_done b c isFalse =>
+      next b c isFalse =>
         generalize h₃ : compile_com c = codec
         generalize h₄ : (compile_bexp b 0 (codelen codec + 1)) = codeb
         constructor
@@ -911,10 +911,66 @@ theorem simulation_step:
             grind
           . simp [codelen_app] at h₂
             grind
+      next b isTrue =>
+        generalize h₃ : compile_com c' = codec
+        generalize h₄ : compile_bexp b 0 (codelen codec + 1) = codeb
+        constructor
+        constructor
+        . apply Or.intro_right
+          constructor
+          . apply compile_bexp_correct
+            rotate_left
+            . exact b
+            . exact 0
+            . exact (codelen codec + 1)
+            . simp [compile_com] at h₁
+              grind
+          . simp [measure', cont_size, com_size]
+        . simp [isTrue]
+          rw [h₄]
+          constructor
+          . simp [compile_com] at h₁
+            rw [h₃, h₄] at h₁
+            grind
+          . simp [compile_com, h₃, h₄] at h₁ h₂
+            apply compile_cont.ccont_while
+            rotate_left 4
+            . exact h₂
+            . exact (-(codelen codeb + codelen codec + 1))
+            rotate_left 3
+            . simp [compile_com, h₃, h₄]
+              exact h₁
+            . grind
+            . grind
+            . grind
+      next =>
+        have := compile_cont_Kseq_inv C c' k' pc st (by simp [compile_com, codelen] at h₂; grind)
+        apply Exists.elim this
+        intro pc'
+        intro ⟨w₁, w₂⟩
+        exists (pc', [], st)
+        constructor
+        . apply Or.intro_right
+          constructor
+          . exact w₁
+          . simp [measure', cont_size, com_size]
+        . constructor
+          . exact w₂.1
+          . simp [compile_com, codelen] at h₂
+            grind
+      next b c =>
+        have := compile_cont_Kwhile_inv C b c k' pc st (by simp [compile_com, codelen] at h₂; grind)
+        apply Exists.elim this
+        intro pc'
+        intro ⟨ w₁, w₂ ⟩
+        exists (pc', [], st)
+        constructor
+        . apply Or.intro_left
+          . exact w₁
+        . constructor
+          . exact w₂.1
+          . exact w₂.2
 
-
-
-      all_goals sorry
 
 
 
@@ -951,26 +1007,6 @@ theorem simulation_step:
 --   inversion STEP; clear STEP; subst; inversion MATCH; clear MATCH; subst; cbn in *.
 
 
--- - (* while loop *)
---   set (codec := compile_com c) in *.
---   set (codeb := compile_bexp b 0 (codelen codec + 1)) in *.
---   econstructor; split.
---   right; split.
---   apply compile_bexp_correct with (b := b). eauto with code.
---   lia.
---   rewrite H. fold codeb. autorewrite with code in *.
---   constructor. eauto with code.
---   eapply ccont_while with (pc' := pc). eauto with code. fold codec. lia.
---   auto.
---   cbn. fold codec; fold codeb. eauto.
---   autorewrite with code. auto.
-
--- - (* skip seq *)
---   autorewrite with code in *.
---   edestruct compile_cont_Kseq_inv as (pc' & X & Y & Z). eauto.
---   econstructor; split.
---   right; split. eauto. lia.
---   constructor; auto.
 
 -- - (* skip while *)
 --   autorewrite with code in *.
