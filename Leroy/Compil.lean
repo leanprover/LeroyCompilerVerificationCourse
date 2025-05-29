@@ -894,13 +894,6 @@ theorem simulation_step:
           . exact w₂.1
           . exact w₂.2
 
-
--- (** The hard work is done!  Nice consequences will follow. *)
-
--- (** First, we get an alternate proof of [compile_program_correct_terminating],
---   using the continuation semantics instead of the big-step semantics
---   to characterize termination of the source program. *)
-
 theorem simulation_steps:
   forall C impconf1 impconf2, star step impconf1 impconf2 ->
   forall machconf1, match_config C impconf1 machconf1 ->
@@ -936,7 +929,6 @@ theorem instr_at_len : instr_at (C ++ [i]) (codelen C) = .some i := by
   induction C
   any_goals grind
 
-
 theorem match_initial_configs:
   forall c s,
   match_config (compile_program c) (c, .Kstop, s) (0, [], s) := by
@@ -967,10 +959,6 @@ theorem compile_program_correct_terminating_2:
         . simp [compile_com, codelen] at D
           exact D
       . exact E
-
--- (** Second, and more importantly, we get a proof of semantic preservation
---   for diverging source programs: if the program makes infinitely many steps,
---   the generated code makes infinitely many machine transitions. *)
 
 theorem simulation_infseq_inv:
   forall C n impconf1 machconf1,
