@@ -71,6 +71,9 @@ def machine_terminates (C: List instr) (s_init: store) (s_final: store) : Prop :
   exists pc, transitions C (0, [], s_init) (pc, [], s_final)
           ∧ instr_at C pc = .some .Ihalt
 
+def machine_diverges (C: List instr) (s_init: store) : Prop :=
+  infseq (transition C) (0, [], s_init)
+
 def machine_goes_wrong (C: List instr) (s_init: store) : Prop :=
   exists pc stk s,
       transitions C (0, [], s_init) (pc, stk, s)
@@ -1002,19 +1005,24 @@ theorem simulation_infseq_inv:
             . exact w.2.1
           . exact w.2.2
 
--- Theorem compile_program_correct_diverging:
---   forall c s,
---   infseq step (c, Kstop, s) ->
---   machine_diverges (compile_program c) s.
--- Proof.
---   intros. set (C := compile_program c).
---   apply infseq_coinduction_principle_2 with
---     (X := fun machconf =>
---           exists impconf, infseq step impconf /\ match_config C impconf machconf).
--- - intros machconf (impconf & INFSEQ & MATCH).
---   edestruct (simulation_infseq_inv C (S (measure impconf)))
---   as (impconf2 & machconf2 & INFSEQ2 & PLUS & MATCH2).
---   eauto. eauto. lia.
---   exists machconf2; split. auto. exists impconf2; auto.
--- - exists (c, Kstop, s); split. auto. apply match_initial_configs.
--- Qed.
+theorem compile_program_correct_diverging:
+  forall c s,
+  infseq step (c, .Kstop, s) ->
+  machine_diverges (compile_program c) s := by
+    intro c s H
+    generalize heq : compile_program c = C
+    unfold machine_diverges
+    apply infseq_coinduction_principle_2 (fun machconf => ∃ impconf, infseq step impconf /\ match_config C impconf machconf)
+    rotate_left
+    . exists (c, .Kstop, s)
+      constructor
+      . exact H
+      . have := match_initial_configs c s
+        rw [heq] at this
+        exact this
+    . intro machconf ⟨ impconf , ⟨INFSEQ, MATCH ⟩⟩
+      have ⟨impconf2 , machconf2, INFSEQ2 , PLUS , MATCH2⟩  := simulation_infseq_inv C (measure' impconf +1) impconf machconf INFSEQ MATCH (by omega)
+      exists machconf2
+      constructor
+      . exact PLUS
+      . exists impconf2
