@@ -106,6 +106,26 @@ theorem plus_one : ∀ a b, R a b → plus R a b := by
     exact rel
     grind
 
+theorem star_plus_trans:
+  forall a b c, star R a b -> plus R b c -> plus R a c := by
+    intro a b c H0 H1
+    cases H0
+    case star_refl =>
+      grind
+    case star_step y a1 a2 =>
+      apply plus.plus_left
+      . exact a1
+      . apply star_trans
+        exact a2
+        apply plus_star
+        exact H1
+
+theorem plus_right:
+  forall a b c, star R a b -> R b c -> plus R a c := by
+  intro a b c h₁ h₂
+  grind [star_plus_trans, plus_one]
+
+
 def all_seq_inf (R : α → α → Prop) (x : α) : Prop :=
   ∀ y : α, star R x y → ∃ z, R y z
 

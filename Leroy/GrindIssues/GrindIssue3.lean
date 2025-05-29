@@ -1,8 +1,9 @@
-import «Leroy».Sequences
+@[grind] inductive star (R : α → α → Prop) : α → α → Prop where
+  | star_refl : ∀ x : α, star R x x
+  | star_step : ∀ x y z, R x y → star R y z → star R x z
 
 set_option grind.debug true
 set_option grind.warning false
-
 
 def ident := String deriving BEq, Repr
 
@@ -26,7 +27,6 @@ def store : Type := ident → Int
 theorem aeval_xplus1 : ∀ s x, aeval s (.PLUS (.VAR x) (.CONST 1)) > aeval s (.VAR x) := by
   grind
 
-
 @[grind] def free_in_aexp (x : ident) (a : aexp) : Prop :=
   match a with
   | .CONST _ => False
@@ -41,12 +41,12 @@ theorem aeval_free :
     fun_induction aeval s1 a <;> grind
 
 inductive bexp : Type where
-  | TRUE
-  | FALSE
-  | EQUAL (a1: aexp) (a2: aexp)
-  | LESSEQUAL (a1: aexp) (a2: aexp)
-  | NOT (b1: bexp)
-  | AND (b1: bexp) (b2: bexp)
+  | TRUE                              -- always true
+  | FALSE                             -- always false
+  | EQUAL (a1: aexp) (a2: aexp)       -- whether [a1 = a2]
+  | LESSEQUAL (a1: aexp) (a2: aexp)   -- whether [a1 <= a2]
+  | NOT (b1: bexp)                    -- Boolean negation
+  | AND (b1: bexp) (b2: bexp)       -- Boolean conjunction
 
 def NOTEQUAL (a1 a2: aexp) : bexp := .NOT (.EQUAL a1 a2)
 
@@ -71,11 +71,11 @@ theorem beval_OR:
   ∀ s b1 b2, beval s (OR b1 b2) = beval s b1 ∨ beval s b2 := by grind
 
 inductive com: Type where
-  | SKIP
-  | ASSIGN (x : ident) (a: aexp)
-  | SEQ (c1: com) (c2: com)
-  | IFTHENELSE (b: bexp) (c1: com) (c2: com)
-  | WHILE (b: bexp) (c1: com)
+  | SKIP                                     -- do nothing
+  | ASSIGN (x : ident) (a: aexp)              -- assignment: [v := a]
+  | SEQ (c1: com) (c2: com)                  -- sequence: [c1; c2]
+  | IFTHENELSE (b: bexp) (c1: com) (c2: com) -- conditional: [if b then c1 else c2]
+  | WHILE (b: bexp) (c1: com)               --loop: [while b do c1 done]
 
 notation:10 l:10 " ;; " r:11 => com.SEQ l r
 
@@ -109,6 +109,7 @@ def Euclidean_division :=
       beval s b = true -> cexec s c s' -> cexec s' (.WHILE b c) s'' ->
       cexec s (.WHILE b c) s''
 
+-- Hit 2
 theorem cexec_infinite_loop:
   ∀ s, ¬ ∃ s', cexec s (.WHILE .TRUE .SKIP) s' := by
   intro _ h
@@ -116,7 +117,8 @@ theorem cexec_infinite_loop:
   intro s'
   generalize heq : (com.WHILE .TRUE .SKIP) = c
   intro h₂
-  induction h₂ <;> grind
+  induction h₂
+  all_goals grind
 
 @[grind] def cexec_bounded (fuel : Nat) (s : store) (c : com) : Option store :=
   match fuel with
@@ -334,52 +336,6 @@ theorem red_progress:
         exists s
         grind
 
-def goes_wrong (c: com) (s: store) : Prop := ∃ c', ∃ s', star red (c, s) (c', s') ∧ irred red (c', s') ∧ c' ≠ .SKIP
-
-@[grind] theorem red_seq_steps (c2 c c' : com) (s s' : store) : star red (c, s) (c', s') → star red ((c;;c2), s) ((c';;c2), s') := by
-  intro H
-  generalize h₁ : (c,s) = v₁
-  generalize h₂ : (c',s') = v₂
-  rw [h₁, h₂] at H
-  induction H generalizing c s
-  case star_refl =>
-   grind
-  case star_step x y _ a₁ a₂ a_ih =>
-    apply star.star_step
-    . apply red.red_seq_step
-      rotate_left
-      . exact y.1
-      . exact y.2
-      . rw [h₁]
-        exact a₁
-    . apply a_ih
-      . rfl
-      . exact h₂
-
-theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s) (.SKIP, s') := by
-  intro h
-  induction h
-  any_goals grind
-  case cexec_seq ih1 ih2  =>
-    apply star_trans
-    . apply red_seq_steps
-      exact ih1
-    . apply star.star_step
-      apply red.red_seq_done
-      exact ih2
-  case cexec_while_loop ih1 ih2 =>
-    apply star_trans
-    . apply star_one
-      . apply red.red_while_loop
-        . grind
-    . apply star_trans
-      . apply red_seq_steps
-        . exact ih1
-      . apply star_trans
-        rotate_left
-        . apply ih2
-        . grind
-
 @[grind] theorem red_append_cexec (c1 c2 : com) (s1 s2 : store) :
   red (c1, s1) (c2, s2) →
   ∀ s', cexec s2 c2 s' → cexec s1 c1 s' := by
@@ -393,8 +349,7 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
       rw [←heq2.1, ←heq2.2] at heq1
       rw [heq1.1, heq1.2]
       apply cexec.cexec_seq
-      . -- Could be good to have an error about a metavariable in here
-        apply cexec.cexec_skip
+      . apply cexec.cexec_skip
       . exact h2
     all_goals grind
 
@@ -413,39 +368,20 @@ theorem reds_to_cexec (s s' : store) (c : com) :
         exact r
       . apply a_ih
         all_goals grind
-
-@[grind] inductive cont where
-| Kstop
-| Kseq (c : com) (k : cont)
-| Kwhile (b : bexp) (c : com) (k : cont)
-
-@[grind] def apply_cont (k: cont) (c: com) : com :=
-  match k with
-  | .Kstop => c
-  | .Kseq c1 k1 => apply_cont k1 (.SEQ c c1)
-  | .Kwhile b1 c1 k1 => apply_cont k1 (.SEQ c (.WHILE b1 c1))
-
-inductive step: com × cont × store -> com × cont × store -> Prop where
-
-  | step_assign: forall x a k s,
-      step (.ASSIGN x a, k, s) (.SKIP, k, update x (aeval s a) s)
-
-  | step_seq: forall c1 c2 s k,
-      step (.SEQ c1 c2, k, s) (c1, .Kseq c2 k, s)
-
-  | step_ifthenelse: forall b c1 c2 k s,
-      step (.IFTHENELSE b c1 c2, k, s) ((if beval s b then c1 else c2), k, s)
-
-  | step_while_done: forall b c k s,
-      beval s b = false ->
-      step (.WHILE b c, k, s) (.SKIP, k, s)
-
-  | step_while_true: forall b c k s,
-      beval s b = true ->
-      step (.WHILE b c, k, s) (c, .Kwhile b c k, s)
-
-  | step_skip_seq: forall c k s,
-      step (.SKIP, .Kseq c k, s) (c, k, s)
-
-  | step_skip_while: forall b c k s,
-      step (.SKIP, .Kwhile b c k, s) (.WHILE b c, k, s)
+/--
+The following theorem causes assertion violation in grind.
+We obtain the following:
+_private.Lean.Meta.Tactic.Grind.Inv.0.Lean.Meta.Grind.checkEqc Lean.Meta.Tactic.Grind.Inv:29:10: assertion violation: isSameExpr e ( __do_lift._@.Lean.Meta.Tactic.Grind.Inv._hyg.31.0 )
+-/
+theorem issue3 (s s' : store) (c : com) :
+  star red (c, s) (.SKIP, s') → cexec s c s' := by
+    intro h
+    generalize heq1 : (c, s) = h1
+    generalize heq2 : (com.SKIP, s') = h2
+    rw [heq1, heq2] at h
+    induction h generalizing c s
+    case star_refl =>
+      grind
+    case star_step r _ a_ih =>
+      -- this is where the assertion violation happens
+      grind

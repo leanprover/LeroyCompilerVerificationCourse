@@ -3,7 +3,7 @@ import «Leroy».Imp
 import Init.Data.List.Basic
 
 set_option grind.warning false
-
+set_option grind.debug true
 @[grind] inductive instr : Type where
   | Iconst (n: Int)
   | Ivar (x: ident)
@@ -17,50 +17,6 @@ set_option grind.warning false
     deriving Repr
 
 @[grind] def codelen (c: List instr) : Int := c.length
-
-/--
-error: `grind` failed
-case grind
-h : ¬codelen [] = 0
-⊢ False
-[grind] Goal diagnostics
-  [facts] Asserted facts
-    [prop] ¬codelen [] = 0
-    [prop] codelen [] = ↑[].length
-    [prop] { toList := [] }.toList.length = 0
-    [prop] [].length = 0
-    [prop] { toList := [] }.toList.length = 0
-  [eqc] False propositions
-    [prop] codelen [] = 0
-  [eqc] Equivalence classes
-    [eqc] {codelen [], ↑[].length}
-    [eqc] {{ toList := [] }.toList, []}
-    [eqc] {{ toList := [] }.toList.length, [].length, 0}
-  [ematch] E-matching patterns
-    [thm] codelen.eq_1: [codelen #0]
-    [thm] codelen.eq_1: [codelen #0]
-    [thm] Array.size_empty: [@List.length #0 (@List.nil _)]
-    [thm] List.size_toArray: [@List.length #1 #0]
-    [thm] List.length_nil: [@List.length #0 (@List.nil _)]
-    [thm] Array.length_toList: [@List.length #1 (@Array.toList _ #0)]
-    [thm] Array.eq_empty_of_size_eq_zero: [@List.length #2 (@Array.toList _ #1)]
-    [thm] Array.size_eq_zero_iff: [@List.length #1 (@Array.toList _ #0)]
-    [thm] Vector.toArray_empty: [@Array.mk #0 (@List.nil _)]
-    [thm] Array.toArray_toList: [@Array.mk #1 (@Array.toList _ #0)]
-[grind] Diagnostics
-  [thm] E-Matching instances
-    [thm] Array.eq_empty_of_size_eq_zero ↦ 1
-    [thm] Array.length_toList ↦ 1
-    [thm] Array.size_empty ↦ 1
-    [thm] Array.size_eq_zero_iff ↦ 1
-    [thm] Array.toArray_toList ↦ 1
-    [thm] List.length_nil ↦ 1
-    [thm] List.size_toArray ↦ 1
-    [thm] Vector.toArray_empty ↦ 1
-    [thm] codelen.eq_1 ↦ 1
--/
-#guard_msgs in
-theorem yet_another : codelen [] = 0 := by grind [codelen]
 
 def stack : Type := List Int
 
@@ -110,19 +66,6 @@ def config : Type := Int × stack × store
 
 @[grind] def transitions (C: List instr) : config → config → Prop :=
   star (transition C)
-/--
-error: tactic 'grind.cases' failed, (non-recursive) inductive type expected at c₂
-  config
-case grind
-C : List instr
-c₁ c₂ : config
-h : transitions C c₁ c₂
-h_1 : ¬star (transition C) c₁ c₂
-⊢ False
--/
-#guard_msgs in
-theorem grind_weirdness : transitions C c₁ c₂ → (star (transition C)) c₁ c₂ := by
-  grind [transitions]
 
 def machine_terminates (C: List instr) (s_init: store) (s_final: store) : Prop :=
   exists pc, transitions C (0, [], s_init) (pc, [], s_final)
@@ -380,7 +323,7 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
               have := @transition.trans_add C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2) + 1) stk s (aeval s a1) (-aeval s a2) (by simp [codelen] at *; grind)
               simp [codelen] at *
               grind
-
+-- Miss 5
 theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : Int) (pc : Int) (stk : stack) (h : code_at C pc (compile_bexp b d1 d0))  :
    transitions C
        (pc, stk, s)
@@ -573,7 +516,7 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
         suffices h2 : code_at C (pc + codelen code3 + (codelen code1 + 1)) (compile_com c2) from by
           specialize ih h2
           simp [codelen_app, codelen_cons]
-          -- grind is failing here
+          -- grind is failing here - same issue as miss 2
           have : (pc + codelen code3 + (codelen code1 + 1) + codelen (compile_com c2)) = (pc + (codelen code3 + (codelen code1 + (codelen code2 + 1)))) := by grind
           rw [this] at ih
           apply ih
@@ -672,27 +615,27 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
 --   there are instructions that perform the computations described in [k]
 --   and reach an [Ihalt] instruction. *)
 
--- Inductive compile_cont (C: code): cont -> Z -> Prop :=
---   | ccont_stop: forall pc,
---       instr_at C pc = Some Ihalt ->
---       compile_cont C Kstop pc
---   | ccont_seq: forall c k pc pc',
---       code_at C pc (compile_com c) ->
---       pc' = pc + codelen (compile_com c) ->
---       compile_cont C k pc' ->
---       compile_cont C (Kseq c k) pc
---   | ccont_while: forall b c k pc d pc' pc'',
---       instr_at C pc = Some(Ibranch d) ->
---       pc' = pc + 1 + d ->
---       code_at C pc' (compile_com (WHILE b c)) ->
---       pc'' = pc' + codelen (compile_com (WHILE b c)) ->
---       compile_cont C k pc'' ->
---       compile_cont C (Kwhile b c k) pc
---   | ccont_branch: forall d k pc pc',
---       instr_at C pc = Some(Ibranch d) ->
---       pc' = pc + 1 + d ->
---       compile_cont C k pc' ->
---       compile_cont C k pc.
+inductive compile_cont (C: List instr) : cont -> Int -> Prop where
+  | ccont_stop: forall pc,
+      instr_at C pc = .some .Ihalt ->
+      compile_cont C .Kstop pc
+  | ccont_seq: forall c k pc pc',
+      code_at C pc (compile_com c) ->
+      pc' = pc + codelen (compile_com c) ->
+      compile_cont C k pc' ->
+      compile_cont C (.Kseq c k) pc
+  | ccont_while: forall b c k pc d pc' pc'',
+      instr_at C pc = .some (.Ibranch d) ->
+      pc' = pc + 1 + d ->
+      code_at C pc' (compile_com (.WHILE b c)) ->
+      pc'' = pc' + codelen (compile_com (.WHILE b c)) ->
+      compile_cont C k pc'' ->
+      compile_cont C (.Kwhile b c k) pc
+  | ccont_branch: forall d k pc pc',
+      instr_at C pc = .some (.Ibranch d) ->
+      pc' = pc + 1 + d ->
+      compile_cont C k pc' ->
+      compile_cont C k pc
 
 -- (** Then, a configuration [(c,k,s)] of the small-step semantics matches
 --   a configuration [(C, pc, stk, s')] of the machine if the following conditions hold:
@@ -703,12 +646,11 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
 -- - The machine code at point [pc + codelen (compile_com c)] matches continuation
 --   [k], in the sense of [compile_cont] above.
 -- *)
-
--- Inductive match_config (C: code): com * cont * store -> config -> Prop :=
---   | match_config_intro: forall c k st pc,
---       code_at C pc (compile_com c) ->
---       compile_cont C k (pc + codelen (compile_com c)) ->
---       match_config C (c, k, st) (pc, nil, st).
+inductive match_config (C: List instr): com × cont × store -> config -> Prop where
+  | match_config_intro: forall c k st pc,
+      code_at C pc (compile_com c) ->
+      compile_cont C k (pc + codelen (compile_com c)) ->
+      match_config C (c, k, st) (pc, [], st)
 
 -- (** We are now ready to prove the expected simulation property.
 --   Since some transitions in the source command correspond to zero transitions
@@ -741,66 +683,98 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
 --   the sum of the sizes of the command [c] under focus and all the commands
 --   appearing in the continuation [k]. *)
 
--- Fixpoint com_size (c: com) : nat :=
---   match c with
---   | SKIP => 1%nat
---   | ASSIGN x a => 1%nat
---   | (c1 ;; c2) => (com_size c1 + com_size c2 + 1)%nat
---   | IFTHENELSE b c1 c2 => (com_size c1 + com_size c2 + 1)%nat
---   | WHILE b c1 => (com_size c1 + 1)%nat
---   end.
+def com_size (c: com) : Nat :=
+  match c with
+  | .SKIP => 1
+  |.ASSIGN _ _ => 1
+  | (c1 ;; c2) => (com_size c1 + com_size c2 + 1)
+  | .IFTHENELSE _ c1 c2 => (com_size c1 + com_size c2 + 1)
+  | .WHILE _ c1 => (com_size c1 + 1)
 
--- Remark com_size_nonzero: forall c, (com_size c > 0)%nat.
--- Proof.
---   induction c; cbn; lia.
--- Qed.
 
--- Fixpoint cont_size (k: cont) : nat :=
---   match k with
---   | Kstop => 0%nat
---   | Kseq c k' => (com_size c + cont_size k')%nat
---   | Kwhile b c k' => cont_size k'
---   end.
+theorem com_size_nonzero: forall c, (com_size c > 0) := by
+  intro c
+  fun_induction com_size <;> grind
 
--- Definition measure (impconf: com * cont * store) : nat :=
---   match impconf with (c, k, m) => (com_size c + cont_size k)%nat end.
+def cont_size (k: cont) : Nat :=
+  match k with
+  | .Kstop => 0
+  | .Kseq c k' => (com_size c + cont_size k')
+  | .Kwhile _ _ k' => cont_size k'
 
--- (** A few technical lemmas to help with the simulation proof. *)
+def measure' (impconf: com × cont × store) : Nat :=
+  match impconf with
+  | (c, k, _) => (com_size c + cont_size k)
 
--- Lemma compile_cont_Kstop_inv:
---   forall C pc s,
---   compile_cont C Kstop pc ->
---   exists pc',
---   star (transition C) (pc, nil, s) (pc', nil, s)
---   /\ instr_at C pc' = Some Ihalt.
--- Proof.
---   intros. dependent induction H.
--- - exists pc; split. apply star_refl. auto.
--- - destruct IHcompile_cont as (pc'' & A & B); auto.
---   exists pc''; split; auto. eapply star_step; eauto. eapply trans_branch; eauto.
--- Qed.
+theorem compile_cont_Kstop_inv (C : List instr) (pc : Int) (s : store):
+  compile_cont C .Kstop pc →
+  ∃ pc',
+  star (transition C) (pc, [], s) (pc', [], s)
+  ∧ instr_at C pc' = .some .Ihalt := by
+    intro H
+    generalize h₁ : cont.Kstop = a₁
+    generalize h₂ : pc = a₂
+    rw [h₁, h₂] at H
+    induction H generalizing pc <;> grind
 
--- Lemma compile_cont_Kseq_inv:
---   forall C c k pc s,
---   compile_cont C (Kseq c k) pc ->
---   exists pc',
---   star (transition C) (pc, nil, s) (pc', nil, s)
---   /\ code_at C pc' (compile_com c)
---   /\ compile_cont C k (pc' + codelen(compile_com c)).
--- Proof.
---   intros. dependent induction H.
--- - exists pc; split. apply star_refl. split; congruence.
--- - edestruct IHcompile_cont as (pc'' & A & B). eauto.
---   exists pc''; split; auto. eapply star_step; eauto. eapply trans_branch; eauto.
--- Qed.
+theorem compile_cont_Kseq_inv (C : List instr) (c : com) (k :cont) (pc : Int) (s : store) (H : compile_cont C (.Kseq c k) pc):
+  ∃ pc',
+  star (transition C) (pc, [], s) (pc', [], s)
+  ∧ code_at C pc' (compile_com c)
+  ∧ compile_cont C k (pc' + codelen (compile_com c)) := by
+    generalize h₁ : (cont.Kseq c k) = a₁
+    generalize h₂ : pc = a₂
+    rw [h₁, h₂] at H
+    induction H generalizing pc k
+    any_goals grind
+    case ccont_seq c' k' pc₂ pc₃ a₃ a₄ a₅ ih =>
+      exists pc₂
+      injection h₁
+      rename_i h₃ h₄
+      apply And.intro
+      . apply star.star_refl
+      . all_goals grind
 
--- Lemma compile_cont_Kwhile_inv:
---   forall C b c k pc s,
---   compile_cont C (Kwhile b c k) pc ->
---   exists pc',
---   plus (transition C) (pc, nil, s) (pc', nil, s)
---   /\ code_at C pc' (compile_com (WHILE b c))
---   /\ compile_cont C k (pc' + codelen(compile_com (WHILE b c))).
+theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont) (pc : Int) (s : store) (H : compile_cont C (.Kwhile b c k) pc):
+  ∃ pc',
+  plus (transition C) (pc, [], s) (pc', [], s)
+  ∧ code_at C pc' (compile_com (.WHILE b c))
+  ∧ compile_cont C k (pc' + codelen (compile_com (.WHILE b c))) := by
+    generalize h₁ : (cont.Kwhile b c k) = a₁
+    generalize h₂ : pc = a₂
+    rw [h₁, h₂] at H
+    induction H generalizing pc
+    any_goals grind
+    case ccont_branch d k' pc₂ pc₃ h₃ h₄ h₅ ih =>
+      specialize ih pc₃ h₁ rfl
+      apply Exists.elim ih
+      intro pc₄ ih
+      exists pc₄
+      apply And.intro
+      . rw [h₄] at ih
+        rw [←h₂]
+        rw [←h₂] at ih
+        apply plus.plus_left
+        rotate_left
+        . apply plus_star
+          exact ih.1
+        . apply transition.trans_branch
+          rotate_left
+          . exact rfl
+          . rw [←h₂] at h₃
+            exact h₃
+      . grind
+    case ccont_while b' c' k' pc₂ d pc₃ pc₄ h₃ h₄ h₅ h₆ h₇ ih =>
+      sorry
+
+
+
+
+
+
+
+
+
 -- Proof.
 --   intros. dependent induction H.
 -- - exists (pc + 1 + d); split.
@@ -810,15 +784,156 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
 --   exists pc''; split; auto. eapply plus_left. eapply trans_branch; eauto. apply plus_star; auto.
 -- Qed.
 
--- Lemma match_config_skip:
---   forall C k s pc,
---   compile_cont C k pc ->
---   match_config C (SKIP, k, s) (pc, nil, s).
--- Proof.
---   intros. constructor.
--- - cbn. inversion H; eauto with code.
--- - cbn. autorewrite with code. auto.
--- Qed.
+theorem match_config_skip (C : List instr) (k : cont) (s : store) (pc : Int) (H: compile_cont C k pc):
+ match_config C (.SKIP, k, s) (pc, [], s) := by
+  constructor
+  . simp [compile_com]
+    cases H <;> grind
+  . simp [compile_com, codelen]
+    exact H
+
+theorem simulation_step:
+  forall C impconf1 impconf2 machconf1,
+  step impconf1 impconf2 ->
+  match_config C impconf1 machconf1 ->
+  exists machconf2,
+      (plus (transition C) machconf1 machconf2
+       \/ (star (transition C) machconf1 machconf2
+           /\ (measure' impconf2 < measure' impconf1)))
+   /\ match_config C impconf2 machconf2 := by
+    intro C impconf1 impconf2 matchconf1 STEP MATCH
+    cases MATCH
+    case match_config_intro c k st pc h₁ h₂ =>
+      rcases impconf2 with ⟨c' , k', s'⟩
+      cases STEP
+      next x a =>
+        constructor
+        constructor
+        case h.left =>
+          apply Or.intro_left
+          apply plus_right
+          apply compile_aexp_correct
+          rotate_left
+          exact a
+          rotate_left
+          . simp [compile_com] at h₁
+            grind
+          . apply transition.trans_setvar
+            simp [compile_com] at h₁
+            rotate_left
+            exact x
+            grind
+        apply match_config_skip
+        simp [compile_com] at h₂
+        grind
+      next c2 =>
+        constructor
+        constructor
+        apply Or.intro_right
+        constructor
+        apply star.star_refl
+        simp [measure', com_size, cont_size]
+        grind
+        constructor
+        simp [compile_com] at h₁
+        grind
+        apply compile_cont.ccont_seq
+        . grind
+        rotate_right
+        . exact pc + codelen (compile_com c') + codelen (compile_com c2)
+        . rfl
+        . grind
+      next b c1 c2 =>
+        generalize h₃ : compile_com c1 = code1
+        generalize h₄ : compile_bexp b 0 (codelen code1 + 1) = codeb
+        generalize h₅ : compile_com c2 = code2
+        simp [compile_com, h₃, h₄, h₅] at h₁ h₂
+        constructor
+        constructor
+        apply Or.intro_right
+        constructor
+        . apply compile_bexp_correct
+          rotate_left
+          . exact b
+          . exact 0
+          . exact (codelen code1 + 1)
+          . rw [h₄]
+            grind
+        . simp [measure', com_size]
+          grind
+        . rw [h₄]
+          constructor
+          . by_cases beval st b = true
+            case pos isTrue =>
+              simp [isTrue] at *
+              grind
+            case neg isFalse =>
+              simp [isFalse] at *
+              rw [h₅]
+              have := @code_at_app_right C pc (codeb ++ code1 ++ [instr.Ibranch (codelen code2)]) code2 (by grind [List.append_assoc, List.cons_append, List.nil_append])
+              simp [codelen_cons, codelen_singleton, codelen_app] at this
+              simp [codelen] at *
+              grind
+          . by_cases beval st b = true
+            case pos isTrue =>
+              simp [isTrue] at *
+              apply compile_cont.ccont_branch
+              rotate_right
+              . exact (pc + codelen (codeb ++ (code1 ++ instr.Ibranch (codelen code2) :: code2)))
+              rotate_right
+              . exact codelen code2
+              any_goals grind
+            case neg isFalse =>
+              simp [isFalse] at *
+              grind
+      case mk.mk.step_while_done b c isFalse =>
+        generalize h₃ : compile_com c = codec
+        generalize h₄ : (compile_bexp b 0 (codelen codec + 1)) = codeb
+        constructor
+        constructor
+        apply Or.intro_right
+        constructor
+        . apply compile_bexp_correct
+          rotate_left
+          . exact b
+          . exact 0
+          . exact (codelen codec + 1)
+          . simp [compile_com] at h₁
+            grind
+        . simp [measure', com_size]
+          fun_induction com_size <;> grind
+        . simp [isFalse]
+          rw [h₄]
+          simp [compile_com] at h₂ h₁
+          rw [h₃, h₄] at h₂ h₁
+          constructor
+          . simp [compile_com]
+            grind
+          . simp [codelen_app] at h₂
+            grind
+
+
+
+      all_goals sorry
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -- (** At last, we can state and prove the simulation diagram. *)
 
@@ -835,47 +950,6 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
 --   intros until machconf1; intros STEP MATCH.
 --   inversion STEP; clear STEP; subst; inversion MATCH; clear MATCH; subst; cbn in *.
 
--- - (* assign *)
---   econstructor; split.
---   left. eapply plus_right. eapply compile_aexp_correct; eauto with code.
---   eapply trans_setvar; eauto with code.
---   autorewrite with code in *. apply match_config_skip. auto.
-
--- - (* seq *)
---   econstructor; split.
---   right; split. apply star_refl. lia.
---   autorewrite with code in *. constructor. eauto with code. eapply ccont_seq; eauto with code.
-
--- - (* if *)
---   set (code1 := compile_com c1) in *.
---   set (codeb := compile_bexp b 0 (codelen code1 + 1)) in *.
---   set (code2 := compile_com c2) in *.
---   autorewrite with code in *.
---   econstructor; split.
---   right; split.
---   apply compile_bexp_correct with (b := b). eauto with code.
---   destruct (beval s b); lia.
---   fold codeb. destruct (beval s b).
---   + autorewrite with code. constructor. eauto with code.
---     eapply ccont_branch. eauto with code. eauto.
---     fold code1.
---     replace (pc + codelen codeb + codelen code1 + 1 + codelen code2)
---        with (pc + codelen codeb + codelen code1 + codelen code2 + 1) by lia.
---     auto.
---   + autorewrite with code. constructor. eauto with code. auto.
---     fold code2.
---     replace (pc + codelen codeb + codelen code1 + 1 + codelen code2)
---        with (pc + codelen codeb + codelen code1 + codelen code2 + 1) by lia.
---     auto.
-
--- - (* while stop *)
---   set (codec := compile_com c) in *.
---   set (codeb := compile_bexp b 0 (codelen codec + 1)) in *.
---   econstructor; split.
---   right; split.
---   apply compile_bexp_correct with (b := b). eauto with code.
---   assert (com_size c > 0)%nat by apply com_size_nonzero. lia.
---   rewrite H. fold codeb. autorewrite with code in *. apply match_config_skip. auto.
 
 -- - (* while loop *)
 --   set (codec := compile_com c) in *.
