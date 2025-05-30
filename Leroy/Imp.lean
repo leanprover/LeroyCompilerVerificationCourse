@@ -4,7 +4,7 @@ set_option grind.debug true
 set_option grind.warning false
 
 
-def ident := String deriving BEq, Repr
+def ident := String deriving BEq, Repr, Hashable
 
 inductive aexp : Type where
   | CONST (n : Int)
