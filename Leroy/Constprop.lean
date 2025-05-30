@@ -3,6 +3,15 @@ import «Leroy».Imp
 import Init.Data.List.Basic
 import Std.Data.HashMap
 import Std.Data.HashMap.Lemmas
+open Classical in
+instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
+  beq m n := Id.run do
+    if m.size != n.size then return false
+    for e in m do
+      match n.get? e.1 with
+      | none => return false
+      | some v => if e.2 != v then return false
+    return true
 
 set_option grind.debug true
 set_option grind.warning false
@@ -155,11 +164,8 @@ def Store := Std.HashMap ident Int
 -- In leroy's course this is decidable
 def Equal (S1 S2: Store) := Std.HashMap.Equiv S1 S2
 
-def Equal' (S1 S2 : Store) : Bool := S1.toArray.all (S2.toArray.contains) && S2.toArray.all (S1.toArray.contains)
-
-
--- (** We show the soundness of these lattice operations with respect to
---   the [matches] and the [Le] relations. *)
+noncomputable instance : Decidable (Equal S' S) :=
+  Classical.propDecidable (Equal S' S)
 
 theorem matches_Le: forall s S1 S2, Le S1 S2 -> matches' s S1 -> matches' s S2 := by
   intro s S1 S2 h1 h2
@@ -284,64 +290,89 @@ theorem matches_update: forall s S x n N,
     intro s S x n N m h
     grind
 
-def fixpoint_rec (F: Store -> Store) (fuel: Nat) (S: Store) : Store :=
+@[grind] noncomputable def fixpoint_rec (F: Store -> Store) (fuel: Nat) (S: Store) : Store :=
   match fuel with
   | 0 => Top
   | fuel + 1 =>
       let S' := F S
-      if Equal' S' S then S else fixpoint_rec F fuel S'
-
-
+      if Equal S' S then S else fixpoint_rec F fuel S'
 -- (** Let's say that we will do at most 20 iterations. *)
 
--- Definition num_iter := 20%nat.
+@[grind] def num_iter : Nat := 20
 
--- Definition fixpoint (F: Store -> Store) (init_S: Store) : Store :=
---   fixpoint_rec F num_iter init_S.
+@[grind] noncomputable def fixpoint (F: Store -> Store) (init_S: Store) : Store :=
+  fixpoint_rec F num_iter init_S
 
 -- (** The result [S] of [fixpoint F] is sound, in that it satisfies
 --     [F S <= S] in the lattice ordering. *)
 
--- Lemma fixpoint_sound: forall F init_S,
---   let S := fixpoint F init_S in Le (F S) S.
--- Proof.
---   intros F.
---   assert (A: forall fuel S,
---              fixpoint_rec F fuel S = Top
---              \/ Equal (F (fixpoint_rec F fuel S)) (fixpoint_rec F fuel S) = true).
---   { induction fuel as [ | fuel]; cbn; intros.
---   - auto.
---   - destruct (Equal (F S) S) eqn:E.
---     + auto.
---     + apply IHfuel.
---   }
---   intros.
---   assert (E: S = Top \/ Equal (F S) S = true) by apply A.
---   destruct E as [E | E].
---   - rewrite E.  apply Le_Top.
---   - apply Equal_Le; auto.
--- Qed.
+theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint F init_S) :
+  Le (F S) S := by
+    have A : forall fuel S,
+             fixpoint_rec F fuel S = Top
+             \/ Equal (F (fixpoint_rec F fuel S)) (fixpoint_rec F fuel S) := by
+      intro fuel
+      induction fuel
+      case zero => grind
+      case succ fuel' ih  =>
+        grind
+    have E : S = Top \/ Equal (F S) S = true := by grind
+    cases E <;> grind [Equal_Le]
 
--- (** Now we can analyze commands by executing them "in the abstract".
---   Given an abstract store [S] that represents what we statically know
---   about the values of the variables before executing command [c],
---   [cexec'] returns an abstract store that describes the values of
---   the variables after executing [c]. *)
 
--- Fixpoint Cexec (S: Store) (c: com) : Store :=
---   match c with
---   | SKIP => S
---   | ASSIGN x a => Update x (Aeval S a) S
---   | SEQ c1 c2 => Cexec (Cexec S c1) c2
---   | IFTHENELSE b c1 c2 =>
---       match Beval S b with
---       | Some true => Cexec S c1
---       | Some false => Cexec S c2
---       | None => Join (Cexec S c1) (Cexec S c2)
---       end
---   | WHILE b c1 =>
---       fixpoint (fun x => Join S (Cexec x c1)) S
---   end.
+@[grind] noncomputable def Cexec (S: Store) (c: com) : Store :=
+  match c with
+  | .SKIP => S
+  | .ASSIGN x a => Update x (Aeval S a) S
+  | .SEQ c1 c2 => Cexec (Cexec S c1) c2
+  | .IFTHENELSE b c1 c2 =>
+      match Beval S b with
+      | .some true => Cexec S c1
+      | .some false => Cexec S c2
+      | .none => Join (Cexec S c1) (Cexec S c2)
+  | .WHILE b c1 =>
+      fixpoint (fun x => Join S (Cexec x c1)) S
+
+theorem Cexec_sound:
+  forall c s1 s2 S1,
+  cexec s1 c s2 -> matches' s1 S1 -> matches' s2 (Cexec S1 c) := by
+    intro c
+    induction c
+    next =>
+      intro s1 s2 S1 EXEC
+      cases EXEC
+      grind
+    next x a =>
+      intro s1 s2 S1 EXEC
+      cases EXEC
+      grind
+    next c1 c2 c1_ih c2_ih =>
+      grind
+    next b c1 c2 c1_ih c2_ih =>
+      intro s1 s2 S1 EXEC
+      cases EXEC
+      next EXEC =>
+        by_cases beval s1 b
+        case pos h =>
+          unfold Cexec
+          intro h2
+          have := Beval_sound s1 S1 h2 b
+          split <;> grind
+        case neg h =>
+          simp [h] at EXEC
+          intro h2
+          unfold Cexec
+          have := Beval_sound s1 S1 h2 b
+          split <;> grind
+    case WHILE b c1 c1_ih =>
+      intro s1 s2 S1 EXEC
+      cases EXEC
+      sorry
+
+
+
+
+
 
 -- (** The soundness of the analysis follows. *)
 
