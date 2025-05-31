@@ -364,39 +364,39 @@ theorem Cexec_sound:
           unfold Cexec
           have := Beval_sound s1 S1 h2 b
           split <;> grind
-    case WHILE b c1 c1_ih =>
-      intro s1 s2 S1 EXEC
-      cases EXEC
-      sorry
-
-
-
+    case WHILE b c c1_ih =>
+      intro s1 s2 S1 EXEC MATCHES
+      generalize eq1 : (fun x => Join S1 (Cexec x c)) = F
+      generalize eq2 : fixpoint F S1 = X
+      have INNER : forall s1 c1 s2,
+                 cexec s1 c1 s2 ->
+                 c1 = .WHILE b c ->
+                 matches' s1 X ->
+                 matches' s2 X := by
+                  sorry
+      unfold Cexec
+      rw [eq1, eq2]
+      apply INNER
+      . apply EXEC
+      . rfl
+      . apply matches_Le
+        have := @fixpoint_sound X F
+        apply this
+        rotate_left
+        . exact S1
+        rotate_left
+        . grind
+        . rw [←eq1]
+          simp
+          apply matches_Le
+          . apply Le_Join_l
+          . exact MATCHES
 
 
 
 -- (** The soundness of the analysis follows. *)
 
--- Ltac inv H := inversion H; clear H; subst.
 
--- Lemma Cexec_sound:
---   forall c s1 s2 S1,
---   cexec s1 c s2 -> matches s1 S1 -> matches s2 (Cexec S1 c).
--- Proof.
---   induction c; intros s1 s2 S1 EXEC AG; cbn [Cexec].
--- - (* SKIP *)
---   inv EXEC. auto.
--- - (* ASSIGN *)
---   inv EXEC. apply matches_update. auto. apply Aeval_sound. auto.
--- - (* SEQ *)
---   inv EXEC. apply IHc2 with s'; auto. apply IHc1 with s1; auto.
--- - (* IFTHENELSE *)
---   inv EXEC.
---   destruct (Beval S1 b) as [[]|] eqn:BE.
---   + erewrite Beval_sound in H4 by eauto. apply IHc1 with s1; auto.
---   + erewrite Beval_sound in H4 by eauto. apply IHc2 with s1; auto.
---   + destruct (beval s1 b).
---     * eapply matches_Le. apply Le_Join_l. eapply IHc1; eauto.
---     * eapply matches_Le. apply Le_Join_r. eapply IHc2; eauto.
 -- - (* WHILE *)
 --   set (F := fun x => Join S1 (Cexec x c)).
 --   set (X := fixpoint F S1).
