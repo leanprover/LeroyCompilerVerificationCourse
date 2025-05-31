@@ -333,6 +333,25 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
   | .WHILE b c1 =>
       fixpoint (fun x => Join S (Cexec x c1)) S
 
+theorem INNER' : forall b c X s1 c1 s2,
+                 cexec s1 c1 s2 ->
+                 c1 = .WHILE b c ->
+                 matches' s1 X ->
+                 matches' s2 X := by
+                  intro b c X s1 c1 s2 EXEC EQ
+                  induction EXEC generalizing X b c
+                  any_goals grind
+                  case cexec_while_loop s' b' c' s4 s5 isTrue EXEC2 EXEC3 a_ih a_ih2 =>
+                    intro AG
+                    apply a_ih2
+                    . exact EQ
+                    . apply matches_Le
+                      rotate_left
+                      . specialize a_ih b c  X
+
+
+
+
 theorem Cexec_sound:
   forall c s1 s2 S1,
   cexec s1 c s2 -> matches' s1 S1 -> matches' s2 (Cexec S1 c) := by
@@ -373,7 +392,27 @@ theorem Cexec_sound:
                  c1 = .WHILE b c ->
                  matches' s1 X ->
                  matches' s2 X := by
-                  sorry
+                  intro s3 c1 s4 EXEC2 EQ AG
+                  induction EXEC2
+                  any_goals grind
+                  case cexec_while_loop s' b' c' s5 s6 EXEC2 EXEC3 EXEC4 _ a_ih2 =>
+                    apply a_ih2
+                    . grind
+                    . apply matches_Le
+                      rotate_right
+                      . exact F X
+                      . exact @fixpoint_sound X F S1 (by grind)
+                      . rw [←eq2, ←eq1]
+                        simp
+                        apply matches_Le
+                        apply Le_Join_r
+                        rw [eq1, eq2]
+                        apply c1_ih
+                        injections EQ
+                        rename_i eq1 eq2
+                        rw [eq2] at EXEC3
+                        exact EXEC3
+                        exact AG
       unfold Cexec
       rw [eq1, eq2]
       apply INNER
@@ -391,8 +430,6 @@ theorem Cexec_sound:
           apply matches_Le
           . apply Le_Join_l
           . exact MATCHES
-
-
 
 -- (** The soundness of the analysis follows. *)
 
