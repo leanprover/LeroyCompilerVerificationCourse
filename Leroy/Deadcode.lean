@@ -447,17 +447,17 @@ theorem dce_correct_terminating:
     induction c
     case SKIP => grind
     case ASSIGN x a =>
-      have EQ: aeval s a = aeval s1 a := by
-        apply aeval_agree
-        . exact AG
-        . simp [live]
-          intro y mem
-          sorry
       simp [live] at AG
       by_cases x ∈ L
       case pos inL =>
         cases EXEC
         case cexec_assign =>
+          have EQ: aeval s a = aeval s1 a := by
+            apply aeval_agree
+            . simp [inL] at AG
+              exact AG
+            . intro y mem
+              grind
           exists (update x (aeval s1 a) s1)
           constructor
           case left => grind
@@ -475,25 +475,6 @@ theorem dce_correct_terminating:
           cases EXEC
           case cexec_assign =>
             apply @agree_update_dead <;> grind
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 -- Proof.
 --   induction 1; intros; cbn [dce].
