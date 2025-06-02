@@ -42,21 +42,23 @@ open Classical in
 @[grind] theorem union_characterisation2 (a b c : IdentSet) : a ⊆ (b ∪ c) ↔ a ⊆ b ∨ a ⊆ c  := by
   sorry
 
+@[grind] theorem insert_characterisation (a : IdentSet) (x : ident) : x ∈ a.insert x := by sorry
+
 @[grind] def fv_aexp (a: aexp) : IdentSet :=
   match a with
   | .CONST _ => ∅
   | .VAR v => Std.HashSet.instSingleton.singleton v
-  | .PLUS a1 a2 => Std.HashSet.union (fv_aexp a1) (fv_aexp a2)
-  | .MINUS a1 a2 => Std.HashSet.union (fv_aexp a1) (fv_aexp a2)
+  | .PLUS a1 a2 =>  (fv_aexp a1) ∪ (fv_aexp a2)
+  | .MINUS a1 a2 => (fv_aexp a1) ∪ (fv_aexp a2)
 
 @[grind] def fv_bexp (b: bexp) : IdentSet :=
   match b with
   | .TRUE => ∅
   | .FALSE => ∅
-  | .EQUAL a1 a2 => Std.HashSet.union (fv_aexp a1) (fv_aexp a2)
-  | .LESSEQUAL a1 a2 => Std.HashSet.union (fv_aexp a1) (fv_aexp a2)
+  | .EQUAL a1 a2 => (fv_aexp a1) ∪ (fv_aexp a2)
+  | .LESSEQUAL a1 a2 => (fv_aexp a1) ∪ (fv_aexp a2)
   | .NOT b1 => fv_bexp b1
-  | .AND b1 b2 => Std.HashSet.union  (fv_bexp b1) (fv_bexp b2)
+  | .AND b1 b2 => (fv_bexp b1) ∪ (fv_bexp b2)
 
 @[grind] def fv_com (c: com) : IdentSet :=
   match c with
@@ -87,7 +89,7 @@ open Classical in
   ((F (fixpoint_rec F default n x)) ⊆ (fixpoint_rec F default n x)) ∨ (fixpoint_rec F default n x = default) := by
     induction n generalizing x <;> grind
 
-theorem fixpoint_charact (n : Nat) (F : IdentSet → IdentSet) (default : IdentSet) :
+theorem fixpoint_charact (F : IdentSet → IdentSet) (default : IdentSet) :
     ((F (fixpoint F default)) ⊆ (fixpoint F default)) ∨ (fixpoint F default = default) := by grind
 
 theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F_stable : ∀ x , x ⊆ default -> (F x) ⊆ default): fixpoint F default ⊆ default := by
@@ -169,66 +171,77 @@ theorem live_upper_bound:
       simp [live, fv_com]
       intro L
       apply fixpoint_upper_bound
-      intro x hyp  y mem
-      have : y ∈ fv_bexp b ∨ y ∈ fv_com c1 ∨ y ∈ L := by
-        sorry
-      grind
+      intro x hyp
+      intro y hyp2
+      have : y ∈ fv_bexp b ∨ y ∈ L ∨ y ∈ live c1 x := by grind
+      apply Or.elim this
+      next =>
+        intro hyp3
+        grind
+      next =>
+        intro hyp3
+        apply Or.elim hyp3
+        next => grind
+        next =>
+          clear hyp3
+          intro hyp3
+          specialize c1_ih x y hyp3
+          have : y ∈ fv_com c1 ∨ y ∈ x := by grind
+          apply Or.elim this
+          next => intros; grind
+          next =>
+            intro hyp4
+            specialize hyp y hyp4
+            grind
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- Proof.
---   induction c; intros; simpl.
--- - fsetdec.
--- - destruct (IdentSet.mem x L) eqn:MEM. fsetdec. fsetdec.
--- - specialize (IHc1 (live c2 L)). specialize (IHc2 L). fsetdec.
--- - specialize (IHc1 L). specialize (IHc2 L). fsetdec.
--- - apply fixpoint_upper_bound. intro x. specialize (IHc x). fsetdec.
--- Qed.
-
--- Lemma live_while_charact:
---   forall b c L,
---   let L' := live (WHILE b c) L in
---   IdentSet.Subset (fv_bexp b) L' /\ IdentSet.Subset L L' /\ IdentSet.Subset (live c L') L'.
--- Proof.
---   intros.
---   specialize (fixpoint_charact
---     (fun x : IdentSet.t => IdentSet.union (IdentSet.union (fv_bexp b) L) (live c x))
---           (IdentSet.union (IdentSet.union (fv_bexp b) (fv_com c)) L)).
---   simpl in L'. fold L'. intros [A|A].
--- - split. fsetdec. split; fsetdec.
--- - split. rewrite A. fsetdec.
---   split. rewrite A. fsetdec.
---   eapply ISProp.subset_trans. apply live_upper_bound. rewrite A. fsetdec.
--- Qed.
-
--- (** ** 10.2 The optimization: dead code elimination *)
+theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
+  (eq : L' = live (.WHILE b c) L) :
+  (fv_bexp b) ⊆ L' ∧ L ⊆ L' ∧ (live c L') ⊆ L' := by
+    have hyp := fixpoint_charact (fun x : IdentSet => (fv_bexp b) ∪ L ∪ (live c x)) ((fv_bexp b) ∪ (fv_com c) ∪ L)
+    apply Or.elim hyp
+    case left =>
+      intro included
+      constructor
+      case left =>
+        intro y contained
+        specialize included y (by grind)
+        grind
+      case right =>
+        constructor
+        case left =>
+          intro y mem
+          specialize included y (by grind)
+          grind
+        case right =>
+          intro y mem
+          rw [eq]
+          specialize included y (by grind)
+          grind
+    case right =>
+      intro equal
+      constructor
+      case left =>
+        intro y mem
+        grind
+      case right =>
+        constructor
+        case left =>
+          intro y mem
+          grind
+        case right =>
+          intro y mem
+          sorry
 
 -- (** Dead code elimination turns assignments [x := a] to dead variables [x]
 --   into [SKIP] statements. *)
 
--- Fixpoint dce (c: com) (L: IdentSet.t): com :=
---   match c with
---   | SKIP => SKIP
---   | ASSIGN x a => if IdentSet.mem x L then ASSIGN x a else SKIP
---   | SEQ c1 c2 => SEQ (dce c1 (live c2 L)) (dce c2 L)
---   | IFTHENELSE b c1 c2 => IFTHENELSE b (dce c1 L) (dce c2 L)
---   | WHILE b c => WHILE b (dce c (live (WHILE b c) L))
---   end.
+@[grind] noncomputable def dce (c: com) (L: IdentSet): com :=
+  match c with
+  | .SKIP => .SKIP
+  | .ASSIGN x a => if x ∈ L then .ASSIGN x a else .SKIP
+  | .SEQ c1 c2 => .SEQ (dce c1 (live c2 L)) (dce c2 L)
+  | .IFTHENELSE b c1 c2 => .IFTHENELSE b (dce c1 L) (dce c2 L)
+  | .WHILE b c => .WHILE b (dce c (live (.WHILE b c) L))
 
 -- (** Example of optimization. *)
 
@@ -254,36 +267,141 @@ theorem live_upper_bound:
 -- (** Two stores agree on a set [L] of live variables if they assign
 --   the same values to each live variable. *)
 
--- Definition agree (L: IdentSet.t) (s1 s2: store) : Prop :=
---   forall x, IdentSet.In x L -> s1 x = s2 x.
+@[grind] def agree (L: IdentSet) (s1 s2: store) : Prop :=
+  forall x, x  ∈ L -> s1 x = s2 x
 
 -- (** Monotonicity property. *)
 
--- Lemma agree_mon:
---   forall L L' s1 s2,
---   agree L' s1 s2 -> IdentSet.Subset L L' -> agree L s1 s2.
--- Proof.
---   unfold IdentSet.Subset, agree; intros. auto.
--- Qed.
+@[grind] theorem agree_mon:
+  forall L L' s1 s2,
+  agree L' s1 s2 -> L ⊆ L' -> agree L s1 s2 := by
+    intro L L' s1 s2 AG sub
+    unfold agree at *
+    intro x inL
+    specialize sub x inL
+    specialize AG x sub
+    exact AG
+
 
 -- (** Agreement on the free variables of an expression implies that this
 --     expression evaluates identically in both stores. *)
 
--- Lemma aeval_agree:
---   forall L s1 s2, agree L s1 s2 ->
---   forall a, IdentSet.Subset (fv_aexp a) L -> aeval s1 a = aeval s2 a.
--- Proof.
---   induction a; simpl; intros.
--- - auto.
--- - apply H. fsetdec.
--- - f_equal. apply IHa1. fsetdec. apply IHa2. fsetdec.
--- - f_equal. apply IHa1. fsetdec. apply IHa2. fsetdec.
--- Qed.
+@[grind] theorem aeval_agree:
+  forall L s1 s2, agree L s1 s2 ->
+  forall a, (fv_aexp a) ⊆ L -> aeval s1 a = aeval s2 a := by
+    intro L s1 s2 AG a
+    induction a
+    any_goals grind
+    case VAR x =>
+      simp [fv_aexp]
+      intro mem
+      have : x ∈ L := by
+        have := insert_characterisation ∅ x
+        specialize mem x this
+        exact mem
+      simp [aeval]
+      unfold agree at AG
+      specialize AG x this
+      exact AG
+    case PLUS a1 a2 a1_ih a2_ih =>
+      intro contained
+      simp [aeval]
+      congr 1
+      next =>
+        apply a1_ih
+        simp [fv_aexp] at contained
+        intro y mem
+        specialize contained y (by grind)
+        exact contained
+      next =>
+        apply a2_ih
+        simp [fv_aexp] at contained
+        intro y mem
+        specialize contained y (by grind)
+        exact contained
+    case MINUS a1 a2 a1_ih a2_ih =>
+      intro contained
+      simp [aeval]
+      congr 1
+      next =>
+        apply a1_ih
+        simp [fv_aexp] at contained
+        intro y mem
+        specialize contained y (by grind)
+        exact contained
+      next =>
+        apply a2_ih
+        simp [fv_aexp] at contained
+        intro y mem
+        specialize contained y (by grind)
+        exact contained
 
--- Lemma beval_agree:
---   forall L s1 s2, agree L s1 s2 ->
---   forall b, IdentSet.Subset (fv_bexp b) L -> beval s1 b = beval s2 b.
--- Proof.
+
+theorem beval_agree:
+  ∀ L s1 s2, agree L s1 s2 ->
+  forall b, (fv_bexp b) ⊆ L -> beval s1 b = beval s2 b := by
+    intro L s1 s2 AG b
+    induction b
+    any_goals grind
+    case EQUAL a1 a2 =>
+      intro cont
+      unfold agree at AG
+      simp [fv_bexp] at cont
+      have aeval_lemma := aeval_agree L s1 s2 AG
+      have subgoal1 : fv_aexp a1 ⊆ L := by
+        intro y mem
+        specialize cont y (by grind)
+        exact cont
+      have subgoal2 : fv_aexp a2 ⊆ L := by
+        intro y mem
+        specialize cont y (by grind)
+        exact cont
+      have eq1 := aeval_lemma a1 subgoal1
+      have eq2 := aeval_lemma a2 subgoal2
+      grind
+    case LESSEQUAL a1 a2 =>
+      intro cont
+      unfold agree at AG
+      simp [fv_bexp] at cont
+      have aeval_lemma := aeval_agree L s1 s2 AG
+      have subgoal1 : fv_aexp a1 ⊆ L := by
+        intro y mem
+        specialize cont y (by grind)
+        exact cont
+      have subgoal2 : fv_aexp a2 ⊆ L := by
+        intro y mem
+        specialize cont y (by grind)
+        exact cont
+      have eq1 := aeval_lemma a1 subgoal1
+      have eq2 := aeval_lemma a2 subgoal2
+      grind
+    case AND b1 b2 b1_ih b2_ih =>
+      intro cont
+      simp [fv_bexp] at cont
+      have : fv_bexp b1 ⊆ L ∧ fv_bexp b2 ⊆ L := by
+        constructor
+        case left =>
+          intro y mem
+          specialize cont y (by grind)
+          exact cont
+        case right =>
+          intro y mem
+          specialize cont y (by grind)
+          exact cont
+      specialize b1_ih (by grind)
+      specialize b2_ih (by grind)
+      grind
+
+
+
+
+
+
+
+
+
+
+
 --   induction b; simpl; intros.
 -- - auto.
 -- - auto.
