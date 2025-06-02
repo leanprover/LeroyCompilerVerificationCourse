@@ -230,7 +230,8 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
           grind
         case right =>
           intro y mem
-          sorry
+          have := live_upper_bound c L' y mem
+          grind
 
 -- (** Dead code elimination turns assignments [x := a] to dead variables [x]
 --   into [SKIP] statements. *)
