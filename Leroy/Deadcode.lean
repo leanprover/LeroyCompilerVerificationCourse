@@ -393,36 +393,23 @@ theorem beval_agree:
       specialize b2_ih (by grind)
       grind
 
-
-
-
-
-
-
-
-
-
-
---   induction b; simpl; intros.
--- - auto.
--- - auto.
--- - rewrite ! (aeval_agree L s1 s2); auto; fsetdec.
--- - rewrite ! (aeval_agree L s1 s2); auto; fsetdec.
--- - f_equal; apply IHb; auto.
--- - f_equal. apply IHb1; fsetdec. apply IHb2; fsetdec.
--- Qed.
-
 -- (** Agreement is preserved by simultaneous assignment to a live variable. *)
 
--- Lemma agree_update_live:
---   forall s1 s2 L x v,
---   agree (IdentSet.remove x L) s1 s2 ->
---   agree L (update x v s1) (update x v s2).
--- Proof.
---   intros; red; intros. unfold update. destruct (string_dec x x0).
--- - auto.
--- - apply H. apply IdentSet.remove_2. auto. auto.
--- Qed.
+theorem agree_update_live:
+  forall s1 s2 L x v,
+  agree (L.erase x) s1 s2 ->
+  agree L (update x v s1) (update x v s2) := by
+    intro s1 s2 L x v AG
+    unfold agree at *
+    intro y
+    specialize AG y
+    intro inL
+    by_cases x = y
+    case neg notEq =>
+      specialize AG (by grind)
+      grind
+    case pos isEq =>
+      grind
 
 -- (** Agreement is also preserved by unilateral assignment to a dead variable. *)
 
