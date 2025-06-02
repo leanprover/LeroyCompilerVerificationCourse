@@ -413,15 +413,17 @@ theorem agree_update_live:
 
 -- (** Agreement is also preserved by unilateral assignment to a dead variable. *)
 
--- Lemma agree_update_dead:
---   forall s1 s2 L x v,
---   agree L s1 s2 -> ~IdentSet.In x L ->
---   agree L (update x v s1) s2.
--- Proof.
---   intros; red; intros. unfold update. destruct (string_dec x x0).
--- - subst x0. contradiction.
--- - apply H; auto.
--- Qed.
+theorem agree_update_dead:
+  forall s1 s2 L x v,
+  agree L s1 s2 -> ¬x ∈ L ->
+  agree L (update x v s1) s2 := by
+    intro s1 s2 L x v AG not
+    unfold agree at *
+    intro y mem
+    specialize AG y mem
+    simp [update]
+    by_cases x=y <;> grind
+
 
 -- (** We now show that dead code elimination preserves semantics for terminating
 --   source program.  We use big-step semantics to show the following diagram:
@@ -437,10 +439,62 @@ theorem agree_update_live:
 -- >>
 --   The proof is a simple induction on the big-step evaluation derivation on the left. *)
 
--- Theorem dce_correct_terminating:
---   forall s c s', cexec s c s' ->
---   forall L s1, agree (live c L) s s1 ->
---   exists s1', cexec s1 (dce c L) s1' /\ agree L s' s1'.
+theorem dce_correct_terminating:
+  forall s c s', cexec s c s' ->
+  forall L s1, agree (live c L) s s1 ->
+  exists s1', cexec s1 (dce c L) s1' /\ agree L s' s1' := by
+    intro s c s' EXEC L s1 AG
+    induction c
+    case SKIP => grind
+    case ASSIGN x a =>
+      have EQ: aeval s a = aeval s1 a := by
+        apply aeval_agree
+        . exact AG
+        . simp [live]
+          intro y mem
+          sorry
+      simp [live] at AG
+      by_cases x ∈ L
+      case pos inL =>
+        cases EXEC
+        case cexec_assign =>
+          exists (update x (aeval s1 a) s1)
+          constructor
+          case left => grind
+          case right =>
+            simp [inL] at AG
+            have := @agree_update_live s s1 L x (aeval s a) (by grind)
+            grind
+      case neg notIn =>
+        exists s1
+        constructor
+        case left =>
+          grind [dce]
+        case right =>
+          simp [notIn] at AG
+          cases EXEC
+          case cexec_assign =>
+            apply @agree_update_dead <;> grind
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- Proof.
 --   induction 1; intros; cbn [dce].
 
