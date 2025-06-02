@@ -184,7 +184,8 @@ forall S1 S2 x n,
   case mpr =>
     grind
   case mp =>
-    sorry
+    simp [Join]
+    grind
 
 theorem Le_Join_l: forall S1 S2, Le S1 (Join S1 S2) := by intros; grind
 
@@ -333,26 +334,7 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
   | .WHILE b c1 =>
       fixpoint (fun x => Join S (Cexec x c1)) S
 
-theorem INNER' : forall b c X s1 c1 s2,
-                 cexec s1 c1 s2 ->
-                 c1 = .WHILE b c ->
-                 matches' s1 X ->
-                 matches' s2 X := by
-                  intro b c X s1 c1 s2 EXEC EQ
-                  induction EXEC generalizing X b c
-                  any_goals grind
-                  case cexec_while_loop s' b' c' s4 s5 isTrue EXEC2 EXEC3 a_ih a_ih2 =>
-                    intro AG
-                    apply a_ih2
-                    . exact EQ
-                    . apply matches_Le
-                      rotate_left
-                      . specialize a_ih b c  X
-
-
-
-
-theorem Cexec_sound:
+@[grind] theorem Cexec_sound:
   forall c s1 s2 S1,
   cexec s1 c s2 -> matches' s1 S1 -> matches' s2 (Cexec S1 c) := by
     intro c
@@ -431,177 +413,134 @@ theorem Cexec_sound:
           . apply Le_Join_l
           . exact MATCHES
 
--- (** The soundness of the analysis follows. *)
+@[grind] def cp_aexp (S: Store) (a: aexp) : aexp :=
+  match a with
+  | .CONST n => .CONST n
+  | .VAR x => match S.get? x with
+    | .some n => .CONST n
+    | .none => .VAR x
+  | .PLUS a1 a2 => mk_PLUS (cp_aexp S a1) (cp_aexp S a2)
+  | .MINUS a1 a2 => mk_MINUS (cp_aexp S a1) (cp_aexp S a2)
 
 
--- - (* WHILE *)
---   set (F := fun x => Join S1 (Cexec x c)).
---   set (X := fixpoint F S1).
---   assert (INNER: forall s1 c1 s2,
---                  cexec s1 c1 s2 ->
---                  c1 = WHILE b c ->
---                  matches s1 X ->
---                  matches s2 X).
---   { induction 1; intros EQ AG1; inv EQ.
---   - (* WHILE stop *)
---     auto.
---   - (* WHILE loop *)
---     apply IHcexec2; auto.
---     unfold X. eapply matches_Le. apply fixpoint_sound.
---     unfold F. eapply matches_Le. apply Le_Join_r.
---     apply IHc with s. auto. fold F. fold X. auto.
---   }
---   eapply INNER; eauto.
---   unfold X. eapply matches_Le. apply fixpoint_sound.
---   unfold F. eapply matches_Le. apply Le_Join_l.
---   auto.
--- Qed.
+@[grind] def cp_bexp (S: Store) (b: bexp) : bexp :=
+  match b with
+  | .TRUE => .TRUE
+  | .FALSE => .FALSE
+  | .EQUAL a1 a2 => mk_EQUAL (cp_aexp S a1) (cp_aexp S a2)
+  | .LESSEQUAL a1 a2 => mk_LESSEQUAL (cp_aexp S a1) (cp_aexp S a2)
+  | .NOT b => mk_NOT (cp_bexp S b)
+  | .AND b1 b2 => mk_AND (cp_bexp S b1) (cp_bexp S b2)
 
+@[grind] theorem cp_aexp_sound:
+  forall s S, matches' s S ->
+  forall a, aeval s (cp_aexp S a) = aeval s a := by
+    intro s S AG a
+    induction a <;> grind [mk_PLUS_sound, mk_MINUS_sound]
 
+theorem cp_bexp_sound:
+  forall s S, matches' s S ->
+  forall b, beval s (cp_bexp S b) = beval s b := by
+    intro s S AG b
+    induction b
+    any_goals grind [mk_EQUAL_sound, mk_LESSEQUAL_sound, mk_AND_sound, mk_NOT_sound]
 
--- (** ** 8.3 The constant propagation optimization *)
+@[grind] noncomputable def cp_com (S: Store) (c: com) : com :=
+  match c with
+  | .SKIP => .SKIP
+  | .ASSIGN x a =>
+      .ASSIGN x (cp_aexp S a)
+  | .SEQ c1 c2 =>
+      .SEQ (cp_com S c1) (cp_com (Cexec S c1) c2)
+  | .IFTHENELSE b c1 c2 =>
+      mk_IFTHENELSE (cp_bexp S b) (cp_com S c1) (cp_com S c2)
+  | .WHILE b c =>
+      let sfix := Cexec S (.WHILE b c)
+      mk_WHILE (cp_bexp sfix b) (cp_com sfix c)
 
--- (** We can use the results of the static analysis to simplify expressions
---   further, replacing variables with known values by these values, then
---   applying the smart constructors. *)
-
--- Fixpoint cp_aexp (S: Store) (a: aexp) : aexp :=
---   match a with
---   | CONST n => CONST n
---   | VAR x => match IdentMap.find x S with Some n => CONST n | None => VAR x end
---   | PLUS a1 a2 => mk_PLUS (cp_aexp S a1) (cp_aexp S a2)
---   | MINUS a1 a2 => mk_MINUS (cp_aexp S a1) (cp_aexp S a2)
---   end.
-
--- Fixpoint cp_bexp (S: Store) (b: bexp) : bexp :=
---   match b with
---   | TRUE => TRUE
---   | FALSE => FALSE
---   | EQUAL a1 a2 => mk_EQUAL (cp_aexp S a1) (cp_aexp S a2)
---   | LESSEQUAL a1 a2 => mk_LESSEQUAL (cp_aexp S a1) (cp_aexp S a2)
---   | NOT b => mk_NOT (cp_bexp S b)
---   | AND b1 b2 => mk_AND (cp_bexp S b1) (cp_bexp S b2)
---   end.
-
--- (** Under the assumption that the concrete store matchess with the abstract store,
---   these optimized expressions evaluate to the same values as the original
---   expressions. *)
-
--- Lemma cp_aexp_sound:
---   forall s S, matches s S ->
---   forall a, aeval s (cp_aexp S a) = aeval s a.
--- Proof.
---   intros s S AG; induction a; cbn.
--- - auto.
--- - destruct (IdentMap.find x S) as [n|] eqn:FIND.
---   + symmetry. apply AG. auto.
---   + auto.
--- - rewrite mk_PLUS_sound, IHa1, IHa2. auto.
--- - rewrite mk_MINUS_sound, IHa1, IHa2. auto.
--- Qed.
-
--- Lemma cp_bexp_sound:
---   forall s S, matches s S ->
---   forall b, beval s (cp_bexp S b) = beval s b.
--- Proof.
---   intros s S AG; induction b; cbn.
--- - auto.
--- - auto.
--- - rewrite mk_EQUAL_sound, ! cp_aexp_sound by auto. auto.
--- - rewrite mk_LESSEQUAL_sound, ! cp_aexp_sound by auto. auto.
--- - rewrite mk_NOT_sound, IHb. auto.
--- - rewrite mk_AND_sound, IHb1, IHb2. auto.
--- Qed.
-
--- (** The optimization of commands consists in propagating constants
---   in expressions and simplifying the expressions, as above.
---   In addition, conditionals and loops whose conditions are statically
---   known will be simplified too, thanks to the smart constructors.
-
---   The [S] parameter is the abstract store "before" the execution of [c].
---   When recursing through [c], it must be updated like the static analysis
---   [Cexec] does.  For example, if [c] is [SEQ c1 c2], [c2] is optimized
---   using [Cexec S c1] as abstract store "before".  Likewise, if
---   [c] is a loop [WHILE b c1], the loop body [c1] is optimized using
---   [Cexec S (WHILE b c1)] as the abstract store "before".
--- *)
-
--- Fixpoint cp_com (S: Store) (c: com) : com :=
---   match c with
---   | SKIP => SKIP
---   | ASSIGN x a =>
---       ASSIGN x (cp_aexp S a)
---   | SEQ c1 c2 =>
---       SEQ (cp_com S c1) (cp_com (Cexec S c1) c2)
---   | IFTHENELSE b c1 c2 =>
---       mk_IFTHENELSE (cp_bexp S b) (cp_com S c1) (cp_com S c2)
---   | WHILE b c =>
---       let sfix := Cexec S (WHILE b c) in
---       mk_WHILE (cp_bexp sfix b) (cp_com sfix c)
---   end.
-
--- (** Example: let's "optimize" Euclidean division under the dubious assumption
---   that the divisor is 0... *)
-
--- Compute (cp_com (Update "b" (Some 0) Top) Euclidean_division).
-
--- (** Result is (in pseudocode):
--- <<
---      r := a;
---      q := 0;
---      while 0 <= r do
---        r := r; q := q + 1
---      done
--- >>
--- *)
-
--- (** The proof of semantic preservation needs an unusual induction pattern:
---   structural induction on the command [c], plus an inner induction
---   on the number of iterations if [c] is a loop [WHILE b c1].
---   This pattern follows closely the structure of the abstract interpreter
---   [Cexec]: structural induction on the command + local fixpoint for loops. *)
-
--- Lemma cp_com_correct_terminating:
---   forall c s1 s2 S1,
---   cexec s1 c s2 -> matches s1 S1 -> cexec s1 (cp_com S1 c) s2.
--- Proof.
---   induction c; intros s1 s2 S1 EXEC AG; cbn [cp_com].
--- - (* SKIP *)
---   auto.
--- - (* ASSIGN *)
---   inv EXEC. replace (aeval s1 a) with (aeval s1 (cp_aexp S1 a)).
---   apply cexec_assign.
---   apply cp_aexp_sound; auto.
--- - (* SEQ *)
---   inv EXEC. apply cexec_seq with s'.
---   apply IHc1; auto.
---   apply IHc2; auto. apply Cexec_sound with s1; auto.
--- - (* IFTHENELSE *)
---   inv EXEC.
---   apply cexec_mk_IFTHENELSE.
---   rewrite cp_bexp_sound by auto.
---   destruct (beval s1 b); auto.
--- - (* WHILE *)
---   set (X := Cexec S1 (WHILE b c)).
---   assert (INNER: forall s1 c1 s2,
---                  cexec s1 c1 s2 ->
---                  c1 = WHILE b c ->
---                  matches s1 X ->
---                  cexec s1 (mk_WHILE (cp_bexp X b) (cp_com X c)) s2).
---   { induction 1; intros EQ AG1; inv EQ.
---   - (* WHILE stop *)
---     apply cexec_mk_WHILE_done. rewrite cp_bexp_sound by auto. auto.
---   - (* WHILE loop *)
---     apply cexec_mk_WHILE_loop with s'. rewrite cp_bexp_sound by auto. auto.
---     apply IHc; auto.
---     apply IHcexec2; auto.
---     unfold X. cbn [Cexec].
---     eapply matches_Le. apply fixpoint_sound.
---     eapply matches_Le. apply Le_Join_r.
---     apply Cexec_sound with s; auto.
---   }
---   eapply INNER; eauto.
---   unfold X. cbn [Cexec].
---   eapply matches_Le. apply fixpoint_sound.
---   eapply matches_Le. apply Le_Join_l. auto.
--- Qed.
+theorem cp_com_correct_terminating:
+  forall c s1 s2 S1,
+  cexec s1 c s2 -> matches' s1 S1 -> cexec s1 (cp_com S1 c) s2 := by
+    intro c s1 s2 S1 EXEC AG
+    induction c generalizing s1 s2 S1
+    any_goals grind
+    case ASSIGN x a =>
+      cases EXEC
+      next =>
+        simp [cp_com]
+        have := @cexec.cexec_assign s1 x (cp_aexp S1 a)
+        grind
+    case IFTHENELSE b c1 c2 c1_ih c2_ih =>
+      cases EXEC
+      next =>
+        apply cexec_mk_IFTHENELSE
+        grind [cp_bexp_sound]
+    case WHILE b c c_ih =>
+      generalize heq1 : com.WHILE b c = loop
+      generalize heq2 : Cexec S1 (.WHILE b c) = X
+      have INNER: forall s1 c1 s2,
+                 cexec s1 c1 s2 ->
+                 c1 = .WHILE b c ->
+                 matches' s1 X ->
+                 cexec s1 (mk_WHILE (cp_bexp X b) (cp_com X c)) s2 := by
+                  intro s1 c1
+                  induction c1 generalizing s1 c
+                  any_goals grind
+                  case WHILE b1 c1 c1_ih  =>
+                    intro s2 EXEC EQ AG1
+                    injections heq1' heq2'
+                    generalize heq : (com.WHILE b1 c1) = loop
+                    rw [heq] at EXEC
+                    induction EXEC
+                    any_goals grind
+                    case cexec_while_done isFalse =>
+                      apply cexec_mk_WHILE_done
+                      . grind [cp_bexp_sound]
+                    case cexec_while_loop s3 b' c' s4 s5 isTrue EXEC2 EXEC3 a_ih a_ih2 =>
+                      apply cexec_mk_WHILE_loop
+                      . grind [cp_bexp_sound]
+                      . apply c_ih
+                        . injections heq4 heq5
+                          rw [heq2'] at heq5
+                          rw [←heq5] at EXEC2
+                          exact EXEC2
+                        . exact AG1
+                      . apply a_ih2
+                        rotate_left
+                        . grind
+                        . apply matches_Le
+                          rw [←heq2]
+                          simp [Cexec]
+                          apply fixpoint_sound
+                          rotate_left
+                          . exact (fun x => Join S1 (Cexec x c))
+                          . exact S1
+                          rotate_left
+                          . grind
+                          . apply matches_Le
+                            . apply Le_Join_r
+                            . apply Cexec_sound
+                              . rw [←heq2']
+                                injections heq3 heq4
+                                rw [heq4]
+                                exact EXEC2
+                              . grind
+      rw [heq1] at EXEC
+      induction EXEC
+      any_goals grind
+      case cexec_while_loop s3 b' c' s4 s5 isTrue EXEC1 EXEC2 ih1 ih2 =>
+        injections heq3 heq4
+        simp [cp_com]
+        specialize INNER s3 (.WHILE b' c') s5
+        rw [←heq3, ←heq4, heq2]
+        apply INNER
+        any_goals grind
+        . rw [←heq2]
+          simp [Cexec]
+          apply matches_Le
+          . apply fixpoint_sound
+            rotate_left
+            . exact (fun x => Join S1 (Cexec x c))
+            . exact S1
+            . grind
+          . grind
