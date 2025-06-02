@@ -36,6 +36,12 @@ open Classical in
 @[grind] instance : EmptyCollection IdentSet where
   emptyCollection := Std.HashSet.emptyWithCapacity
 
+@[grind] theorem union_characterisation (a b : IdentSet) (x : ident) : x ∈ (a ∪ b) ↔ x ∈ a ∨ x ∈ b := by
+  sorry
+
+@[grind] theorem union_characterisation2 (a b c : IdentSet) : a ⊆ (b ∪ c) ↔ a ⊆ b ∨ a ⊆ c  := by
+  sorry
+
 @[grind] def fv_aexp (a: aexp) : IdentSet :=
   match a with
   | .CONST _ => ∅
@@ -56,9 +62,9 @@ open Classical in
   match c with
   | .SKIP => ∅
   | .ASSIGN x a => fv_aexp a
-  | .SEQ c1 c2 => Std.HashSet.union (fv_com c1) (fv_com c2)
-  | .IFTHENELSE b c1 c2 => Std.HashSet.union (fv_bexp b) (Std.HashSet.union (fv_com c1) (fv_com c2))
-  | .WHILE b c => Std.HashSet.union (fv_bexp b) (fv_com c)
+  | .SEQ c1 c2 => (fv_com c1) ∪ (fv_com c2)
+  | .IFTHENELSE b c1 c2 => (fv_bexp b) ∪ ((fv_com c1) ∪ (fv_com c2))
+  | .WHILE b c => (fv_bexp b) ∪ (fv_com c)
 
 
 -- (** To analyze loops, we will need, again!, to compute post-fixpoints
@@ -84,9 +90,7 @@ open Classical in
 theorem fixpoint_charact (n : Nat) (F : IdentSet → IdentSet) (default : IdentSet) :
     ((F (fixpoint F default)) ⊆ (fixpoint F default)) ∨ (fixpoint F default = default) := by grind
 
-
-
-theorem fixpoint_upper_boundnd (F : IdentSet → IdentSet) (default : IdentSet) (F_stable : ∀ x , x ⊆ default -> (F x) ⊆ default): fixpoint F default ⊆ default := by
+theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F_stable : ∀ x , x ⊆ default -> (F x) ⊆ default): fixpoint F default ⊆ default := by
   have : ∀ n : Nat, ∀ x : IdentSet, x ⊆ default → (fixpoint_rec F default n x) ⊆ default := by
     intro n
     induction n
@@ -108,74 +112,85 @@ theorem fixpoint_upper_boundnd (F : IdentSet → IdentSet) (default : IdentSet) 
   unfold instHasSubsetIdentSet
   grind
 
-theorem  fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F_stable : ∀ x , x ⊆ default -> (F x) ⊆ default) :
-   fixpoint F default ⊆ default := by
-    have : ∀ n x, x ⊆ default -> (fixpoint_rec F default n x) ⊆ default := by
-      intro n
-      induction n
-      case zero =>
-        intro x contained
-        unfold fixpoint_rec
+@[grind] noncomputable def live (c: com) (L: IdentSet) : IdentSet :=
+  match c with
+  | .SKIP => L
+  | .ASSIGN x a =>
+      if x ∈ L
+      then (L.erase x) ∪ (fv_aexp a)
+      else L
+  | .SEQ c1 c2 =>
+      live c1 (live c2 L)
+  | .IFTHENELSE b c1 c2 =>
+       (fv_bexp b) ∪ ((live c1 L) ∪ (live c2 L))
+  | .WHILE b c =>
+      let L' := (fv_bexp b) ∪  L
+      let default := (fv_com (.WHILE b c)) ∪ L
+      fixpoint (fun x => L' ∪ (live c x)) default
+
+theorem live_upper_bound:
+  forall c L,
+   (live c L) ⊆ ((fv_com c) ∪  L) := by
+    intro c
+    induction c
+    case SKIP =>
+      intro L
+      simp [fv_com, live]
+      unfold Subset
+      unfold instHasSubsetIdentSet
+      grind
+    case ASSIGN x a =>
+      intro L
+      simp [fv_com, live]
+      split
+      case isTrue h =>
         unfold Subset
         unfold instHasSubsetIdentSet
         grind
-      case succ n ih =>
-        intro x contained
-        unfold fixpoint_rec
-        simp
-        split
-        case isTrue _ =>
-          exact contained
-        case isFalse h =>
-          apply ih
-          apply F_stable
-          exact contained
-    unfold fixpoint
-    apply this
-    unfold Subset
-    unfold instHasSubsetIdentSet
-    grind
+      case isFalse h =>
+        unfold Subset
+        unfold instHasSubsetIdentSet
+        grind
+    case SEQ c1 c2 c1_ih c2_ih =>
+      intro L
+      simp [live, fv_com]
+      unfold Subset at *
+      unfold instHasSubsetIdentSet at *
+      simp at *
+      intro x contained
+      specialize c1_ih (live c2 L) x contained
+      grind
+    case IFTHENELSE b c1 c2 c1_ih c2_ih =>
+      unfold Subset at *
+      unfold instHasSubsetIdentSet at *
+      simp at *
+      grind
+    case WHILE b c1 c1_ih =>
+      simp [live, fv_com]
+      intro L
+      apply fixpoint_upper_bound
+      intro x hyp  y mem
+      have : y ∈ fv_bexp b ∨ y ∈ fv_com c1 ∨ y ∈ L := by
+        sorry
+      grind
 
 
--- Lemma fixpoint_upper_bound:
---   IdentSet.Subset fixpoint default.
--- Proof.
---   assert (forall n x, IdentSet.Subset x default -> IdentSet.Subset (fixpoint_rec n x) default).
---   { induction n; intros; cbn.
---   - red; auto.
---   - destruct (IdentSet.subset (F x) x) eqn:SUBSET.
---     + auto.
---     + apply IHn; auto.
---   }
---   unfold fixpoint. apply H. apply ISProp.subset_empty.
--- Qed.
 
--- End FIXPOINT.
 
--- (** ** Liveness analysis. *)
 
--- (** [L] is the set of variables live "after" command [c].
---   The result of [live c L] is the set of variables live "before" [c]. *)
 
--- Fixpoint live (c: com) (L: IdentSet.t) : IdentSet.t :=
---   match c with
---   | SKIP => L
---   | ASSIGN x a =>
---       if IdentSet.mem x L
---       then IdentSet.union (IdentSet.remove x L) (fv_aexp a)
---       else L
---   | SEQ c1 c2 =>
---       live c1 (live c2 L)
---   | IFTHENELSE b c1 c2 =>
---       IdentSet.union (fv_bexp b) (IdentSet.union (live c1 L) (live c2 L))
---   | WHILE b c =>
---       let L' := IdentSet.union (fv_bexp b) L in
---       let default := IdentSet.union (fv_com (WHILE b c)) L in
---       fixpoint (fun x => IdentSet.union L' (live c x)) default
 
--- Lemma live_upper_bound:
---   forall c L,
---   IdentSet.Subset (live c L) (IdentSet.union (fv_com c) L).
+
+
+
+
+
+
+
+
+
+
+
 -- Proof.
 --   induction c; intros; simpl.
 -- - fsetdec.
