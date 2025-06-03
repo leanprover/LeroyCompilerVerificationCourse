@@ -444,7 +444,7 @@ theorem dce_correct_terminating:
   forall L s1, agree (live c L) s s1 ->
   exists s1', cexec s1 (dce c L) s1' /\ agree L s' s1' := by
     intro s c s' EXEC L s1 AG
-    induction c
+    induction c generalizing s s' L s1
     case SKIP => grind
     case ASSIGN x a =>
       simp [live] at AG
@@ -475,6 +475,66 @@ theorem dce_correct_terminating:
           cases EXEC
           case cexec_assign =>
             apply @agree_update_dead <;> grind
+    case SEQ c1 c2 c1_ih c2_ih =>
+      cases EXEC
+      case cexec_seq s'' EXEC1 EXEC2 =>
+        simp [dce]
+        simp [live] at AG
+        specialize c1_ih s s'' EXEC1 (live c2 L) s1 AG
+        apply Exists.elim c1_ih
+        intro s3 ⟨EXEC', AGREE' ⟩
+        specialize c2_ih s'' s' EXEC2 L s3 AGREE'
+        apply Exists.elim c2_ih
+        intro s4
+        grind
+    case IFTHENELSE b c1 c2 c1_ih c2_ih =>
+      have EQ : beval s b = beval s1 b := by
+        apply beval_agree
+        . apply AG
+        . simp [live]
+          intro y mem
+          grind
+      cases EXEC
+      case cexec_ifthenelse a =>
+        simp [dce]
+        by_cases beval s b = true
+        case pos isTrue =>
+          simp [isTrue] at a
+          simp [live] at AG
+          specialize c1_ih s s' a L s1 (by grind)
+          apply Exists.elim c1_ih
+          intro s''
+          intro ⟨EXEC, AGREE ⟩
+          exists s''
+          grind
+        case neg isFalse =>
+          simp [isFalse] at a
+          simp [live] at AG
+          specialize c2_ih s s' a L s1 (by grind)
+          apply Exists.elim c2_ih
+          intro s''
+          intro ⟨EXEC, AGREE ⟩
+          exists s''
+          grind
+    case WHILE b c1 c1_ih =>
+      cases EXEC
+      case cexec_while_done isFalse =>
+        have ⟨ h1 , h2 ,h3 ⟩  := live_while_charact b c1 L (live (com.WHILE b c1) L) (by grind)
+        have : beval s1 b = false := by
+          have := beval_agree (live (com.WHILE b c1) L) s s1 AG b h1
+          grind
+        exists s1
+        grind
+
+
+
+
+
+
+
+
+
+
 
 -- Proof.
 --   induction 1; intros; cbn [dce].
