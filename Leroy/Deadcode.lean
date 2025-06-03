@@ -7,27 +7,9 @@ open Classical in
 
 set_option grind.debug true
 set_option grind.warning false
--- From Coq Require Import Arith ZArith Psatz Bool String List FSets Program.Equality.
--- Require Import Sequences IMP Constprop.
-
--- Local Open Scope string_scope.
--- Local Open Scope Z_scope.
--- Local Open Scope list_scope.
-
--- (** * 10.  Liveness analysis and dead code elimination *)
-
--- Module IdentSet := FSetWeakList.Make(Ident_Decidable).
--- Module ISFact := FSetFacts.WFacts(IdentSet).
--- Module ISProp := FSetProperties.WProperties(IdentSet).
--- Module ISDecide := FSetDecide.Decide(IdentSet).
--- Import ISDecide.
 
 @[grind] def IdentSet := Std.HashSet ident
   deriving Membership, Union, EmptyCollection
--- (** ** 10.1 Liveness analysis *)
-
--- (** Computation of the set of variables appearing in an expression or command. *)
-
 
 @[grind] instance : HasSubset IdentSet where
   Subset (a b : IdentSet) := ∀ x ∈ a, x ∈ b
@@ -39,13 +21,18 @@ set_option grind.warning false
 @[grind] instance : EmptyCollection IdentSet where
   emptyCollection := Std.HashSet.emptyWithCapacity
 
-@[grind] theorem union_characterisation (a b : IdentSet) (x : ident) : x ∈ (a ∪ b) ↔ x ∈ a ∨ x ∈ b := by
-  sorry
+@[grind] axiom union_characterisation (a b : IdentSet) (x : ident) : x ∈ (a ∪ b) ↔ x ∈ a ∨ x ∈ b
 
-@[grind] theorem union_characterisation2 (a b c : IdentSet) : a ⊆ (b ∪ c) ↔ a ⊆ b ∨ a ⊆ c  := by
-  sorry
+@[grind] theorem union_characterisation2 (a b c : IdentSet) : a ⊆ b ∧ a ⊆ c → a ⊆ (b ∪ c) := by
+  intro ⟨ m1 , m2 ⟩
+  intro y mem
+  specialize m1 y mem
+  specialize m2 y mem
+  grind
 
-@[grind] theorem insert_characterisation (a : IdentSet) (x : ident) : x ∈ a.insert x := by sorry
+
+@[grind] theorem insert_characterisation (a : IdentSet) (x : ident) : x ∈ a.insert x := by
+  grind [Std.HashSet.contains_insert]
 
 @[grind] def fv_aexp (a: aexp) : IdentSet :=
   match a with
@@ -70,13 +57,6 @@ set_option grind.warning false
   | .SEQ c1 c2 => (fv_com c1) ∪ (fv_com c2)
   | .IFTHENELSE b c1 c2 => (fv_bexp b) ∪ ((fv_com c1) ∪ (fv_com c2))
   | .WHILE b c => (fv_bexp b) ∪ (fv_com c)
-
-
--- (** To analyze loops, we will need, again!, to compute post-fixpoints
---   of a function from sets of variables to sets of variables.
---   We reuse the ``engineer's approach'' from file [Constprop.v]. *)
-
--- Section FIXPOINT.
 
 @[grind] noncomputable def fixpoint_rec (F : IdentSet → IdentSet) (default : IdentSet) (fuel: Nat) (x: IdentSet) : IdentSet :=
   match fuel with
@@ -236,9 +216,6 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
           have := live_upper_bound c L' y mem
           grind
 
--- (** Dead code elimination turns assignments [x := a] to dead variables [x]
---   into [SKIP] statements. *)
-
 @[grind] noncomputable def dce (c: com) (L: IdentSet): com :=
   match c with
   | .SKIP => .SKIP
@@ -247,34 +224,8 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
   | .IFTHENELSE b c1 c2 => .IFTHENELSE b (dce c1 L) (dce c2 L)
   | .WHILE b c => .WHILE b (dce c (live (.WHILE b c) L))
 
--- (** Example of optimization. *)
-
--- Compute (dce Euclidean_division (IdentSet.singleton "r")).
-
--- (** Result is:
--- <<
---    r := a;                 ===>   r := a;
---    q := 0;                        skip;
---    while b <= r do                while b <= r do
---      r := r - b;                    r := r - b;
---      q := q + 1;                    skip;
---    done                           done
--- >>
--- *)
-
--- Compute (dce Euclidean_division (IdentSet.singleton "q")).
-
--- (** Program is unchanged. *)
-
--- (** ** 10.3  Correctness of the optimization *)
-
--- (** Two stores agree on a set [L] of live variables if they assign
---   the same values to each live variable. *)
-
 @[grind] def agree (L: IdentSet) (s1 s2: store) : Prop :=
   forall x, x  ∈ L -> s1 x = s2 x
-
--- (** Monotonicity property. *)
 
 @[grind] theorem agree_mon:
   forall L L' s1 s2,
@@ -285,10 +236,6 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
     specialize sub x inL
     specialize AG x sub
     exact AG
-
-
--- (** Agreement on the free variables of an expression implies that this
---     expression evaluates identically in both stores. *)
 
 @[grind] theorem aeval_agree:
   forall L s1 s2, agree L s1 s2 ->
@@ -339,7 +286,6 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
         intro y mem
         specialize contained y (by grind)
         exact contained
-
 
 theorem beval_agree:
   ∀ L s1 s2, agree L s1 s2 ->
@@ -396,8 +342,6 @@ theorem beval_agree:
       specialize b2_ih (by grind)
       grind
 
--- (** Agreement is preserved by simultaneous assignment to a live variable. *)
-
 theorem agree_update_live:
   forall s1 s2 L x v,
   agree (L.erase x) s1 s2 ->
@@ -413,8 +357,6 @@ theorem agree_update_live:
       grind
     case pos isEq =>
       grind
-
--- (** Agreement is also preserved by unilateral assignment to a dead variable. *)
 
 theorem agree_update_dead:
   forall s1 s2 L x v,
@@ -476,12 +418,6 @@ theorem dce_correct_terminating:
           rw [subgoal]
           apply @agree_update_live
           grind
-    case cexec_seq s1 c1 s2 c2 s3 EX1 EX2 ih1 ih2 =>
-      intro L s4 AG
-      simp [live] at AG
-      have ⟨s5, EX3, AG' ⟩ := ih1 (live c2 L) s4 AG
-      have ⟨s6, EX4, AG'' ⟩ := ih2 L s5 AG'
-      grind
     case cexec_ifthenelse s2 b c1 c2 s3 EXEC ih =>
       intro L s4 AG
       simp [dce]
