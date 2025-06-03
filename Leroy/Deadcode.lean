@@ -4,6 +4,9 @@ import Init.Data.List.Basic
 import Std.Data.HashSet
 import Std.Data.HashSet.Lemmas
 open Classical in
+
+set_option grind.debug true
+set_option grind.warning false
 -- From Coq Require Import Arith ZArith Psatz Bool String List FSets Program.Equality.
 -- Require Import Sequences IMP Constprop.
 
@@ -424,173 +427,101 @@ theorem agree_update_dead:
     simp [update]
     by_cases x=y <;> grind
 
-
--- (** We now show that dead code elimination preserves semantics for terminating
---   source program.  We use big-step semantics to show the following diagram:
--- <<
---                 agree (live c L) s s1
---      c / s ----------------------------- dce C L / s1
---        |                                          |
---        |                                          |
---        |                                          |
---        v                                          v
---       s' -------------------------------------- s1'
---                     agree L s' s1'
--- >>
---   The proof is a simple induction on the big-step evaluation derivation on the left. *)
-
 theorem dce_correct_terminating:
   forall s c s', cexec s c s' ->
   forall L s1, agree (live c L) s s1 ->
   exists s1', cexec s1 (dce c L) s1' /\ agree L s' s1' := by
-    intro s c s' EXEC L s1 AG
-    induction c generalizing s s' L s1
-    case SKIP => grind
-    case ASSIGN x a =>
+    intro s c s' EXEC
+    induction EXEC
+    any_goals grind
+    case cexec_while_loop s1 b c1 s2 s3 isTrue EX1 EX2 a_ih a_ih2 =>
+      intro L s4 hyp
+      have := live_while_charact b c1 L  (live (com.WHILE b c1) L) (by grind)
+      have : agree (live c1 (live (com.WHILE b c1) L)) s1 s4 := by
+        apply agree_mon
+        . exact hyp
+        . grind
+      have ⟨ t1, ht1, ht2⟩ :=  a_ih (live (.WHILE b c1) L) s4 this
+      have ⟨u1, hu1, hu2 ⟩ :=  a_ih2 L t1 ht2
+      exists u1
+      constructor
+      rotate_right
+      . exact hu2
+      . apply cexec.cexec_while_loop
+        . have := beval_agree (live (com.WHILE b c1) L) s1 s4 hyp b (by grind)
+          grind
+        . exact ht1
+        . grind
+    case cexec_assign s2 x a=>
+      intro L s3 AG
       simp [live] at AG
       by_cases x ∈ L
-      case pos inL =>
-        cases EXEC
-        case cexec_assign =>
-          have EQ: aeval s a = aeval s1 a := by
+      case neg notIn =>
+        exists s3
+        constructor
+        . grind [dce]
+        . simp [notIn] at AG
+          exact @agree_update_dead s2 s3 L x (aeval s2 a) (by grind) notIn
+      case pos isIn =>
+        simp [isIn] at AG
+        exists (update x (aeval s3 a) s3)
+        constructor
+        . simp [dce, isIn]
+          grind
+        . have subgoal : aeval s2 a = aeval s3 a := by
             apply aeval_agree
-            . simp [inL] at AG
-              exact AG
+            . exact AG
             . intro y mem
               grind
-          exists (update x (aeval s1 a) s1)
-          constructor
-          case left => grind
-          case right =>
-            simp [inL] at AG
-            have := @agree_update_live s s1 L x (aeval s a) (by grind)
-            grind
-      case neg notIn =>
-        exists s1
-        constructor
-        case left =>
-          grind [dce]
-        case right =>
-          simp [notIn] at AG
-          cases EXEC
-          case cexec_assign =>
-            apply @agree_update_dead <;> grind
-    case SEQ c1 c2 c1_ih c2_ih =>
-      cases EXEC
-      case cexec_seq s'' EXEC1 EXEC2 =>
-        simp [dce]
-        simp [live] at AG
-        specialize c1_ih s s'' EXEC1 (live c2 L) s1 AG
-        apply Exists.elim c1_ih
-        intro s3 ⟨EXEC', AGREE' ⟩
-        specialize c2_ih s'' s' EXEC2 L s3 AGREE'
-        apply Exists.elim c2_ih
-        intro s4
-        grind
-    case IFTHENELSE b c1 c2 c1_ih c2_ih =>
-      have EQ : beval s b = beval s1 b := by
+          rw [subgoal]
+          apply @agree_update_live
+          grind
+    case cexec_seq s1 c1 s2 c2 s3 EX1 EX2 ih1 ih2 =>
+      intro L s4 AG
+      simp [live] at AG
+      have ⟨s5, EX3, AG' ⟩ := ih1 (live c2 L) s4 AG
+      have ⟨s6, EX4, AG'' ⟩ := ih2 L s5 AG'
+      grind
+    case cexec_ifthenelse s2 b c1 c2 s3 EXEC ih =>
+      intro L s4 AG
+      simp [dce]
+      have EQ : beval s2 b = beval s4 b := by
         apply beval_agree
         . apply AG
         . simp [live]
           intro y mem
           grind
-      cases EXEC
-      case cexec_ifthenelse a =>
-        simp [dce]
-        by_cases beval s b = true
-        case pos isTrue =>
-          simp [isTrue] at a
-          simp [live] at AG
-          specialize c1_ih s s' a L s1 (by grind)
-          apply Exists.elim c1_ih
-          intro s''
-          intro ⟨EXEC, AGREE ⟩
-          exists s''
+      by_cases beval s2 b = true
+      case pos isTrue =>
+        simp [isTrue] at EXEC
+        specialize ih L s4
+        simp [live] at AG
+        simp [isTrue] at ih
+        have ⟨s5 , EX', AG' ⟩ := ih (by grind)
+        exists s5
+        constructor
+        . apply cexec.cexec_ifthenelse
           grind
-        case neg isFalse =>
-          simp [isFalse] at a
-          simp [live] at AG
-          specialize c2_ih s s' a L s1 (by grind)
-          apply Exists.elim c2_ih
-          intro s''
-          intro ⟨EXEC, AGREE ⟩
-          exists s''
+        . exact AG'
+      case neg isFalse =>
+        simp [isFalse] at EXEC
+        specialize ih L s4
+        simp [live] at AG
+        simp [isFalse] at ih
+        have ⟨s5 , EX', AG' ⟩ := ih (by grind)
+        exists s5
+        constructor
+        . apply cexec.cexec_ifthenelse
           grind
-    case WHILE b c1 c1_ih =>
-      cases EXEC
-      case cexec_while_done isFalse =>
-        have ⟨ h1 , h2 ,h3 ⟩  := live_while_charact b c1 L (live (com.WHILE b c1) L) (by grind)
-        have : beval s1 b = false := by
-          have := beval_agree (live (com.WHILE b c1) L) s s1 AG b h1
-          grind
-        exists s1
-        grind
-
-
-
-
-
-
-
-
-
-
-
--- Proof.
---   induction 1; intros; cbn [dce].
-
--- - (* skip *)
---   exists s1; split. apply cexec_skip. auto.
-
--- - (* assign *)
---   cbn in H. destruct (IdentSet.mem x L) eqn:LIVE_AFTER.
---   + (* x is live after *)
---     assert (EQ: aeval s a = aeval s1 a).
---     { eapply aeval_agree. eauto. fsetdec. }
---     exists (update x (aeval s1 a) s1); split.
---     apply cexec_assign.
---     rewrite EQ. apply agree_update_live. eapply agree_mon. eauto. fsetdec.
---   + (* x is dead after *)
---     exists s1; split.
---     apply cexec_skip.
---     apply agree_update_dead. auto.
---     rewrite ISFact.mem_iff. congruence.
-
--- - (* seq *)
---   cbn in H1.
---   destruct (IHcexec1 _ _ H1) as [s1' [E1 A1]].
---   destruct (IHcexec2 _ _ A1) as [s2' [E2 A2]].
---   exists s2'; split.
---   apply cexec_seq with s1'; auto.
---   auto.
-
--- - (* ifthenelse *)
---   cbn in H0.
---   assert (EQ: beval s b = beval s1 b).
---   { eapply beval_agree. eauto. fsetdec. }
---   destruct (IHcexec L s1) as [s1' [E A]].
---     eapply agree_mon; eauto. destruct (beval s b); fsetdec.
---   exists s1'; split.
---   apply cexec_ifthenelse. rewrite <- EQ. destruct (beval s b); auto.
---   auto.
-
--- - (* while done *)
---   destruct (live_while_charact b c L) as [P [Q R]].
---   assert (beval s1 b = false).
---   { rewrite <- H. symmetry. eapply beval_agree; eauto. }
---   exists s1; split.
---   apply cexec_while_done. auto.
---   eapply agree_mon; eauto.
-
--- - (* while loop *)
---   destruct (live_while_charact b c L) as [P [Q R]].
---   assert (beval s1 b = true).
---   { rewrite <- H. symmetry. eapply beval_agree; eauto. }
---   destruct (IHcexec1 (live (WHILE b c) L) s1) as [s2 [E1 A1]].
---     eapply agree_mon; eauto.
---   destruct (IHcexec2 L s2) as [s3 [E2 A2]].
---     auto.
---   exists s3; split.
---   apply cexec_while_loop with s2; auto.
---   auto.
--- Qed.
+        . exact AG'
+    case cexec_while_done s2 b c isFalse =>
+      intro L s1 AG
+      have ⟨ h1 , h2 , h3 ⟩ := live_while_charact b c L (live (com.WHILE b c) L) (by grind)
+      have EQ : beval s2 b = beval s1 b := by
+        apply beval_agree
+        . apply AG
+        . intro y mem
+          specialize h1 y mem
+          exact h1
+      exists s1
+      grind
