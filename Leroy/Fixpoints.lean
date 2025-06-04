@@ -1,15 +1,4 @@
--- From Coq Require Import Arith ZArith Psatz Bool String List FMaps Program Wellfounded.
--- Require Import Sequences IMP Compil Constprop.
-
--- (** * 9. More about fixpoints *)
-
--- (** ** 9.1 From Knaster-Tarski to effective computation of fixpoints *)
-
--- Section FIXPOINT.
-
--- (** Consider a type [A] equipped with a decidable equality [eq] and a
---     transitive ordering [le]. *)
-
+set_option grind.warning false
 
 universe u
 
@@ -55,73 +44,7 @@ theorem fixpoint_exists_1: ∃ x : α, eq x (F x) := by
   apply REC
   apply bot_smallest
 
-
-#check WellFounded.induction
--- (** Let's show the existence of a fixpoint, as in the Knaster-Tarski theorem.
---   The proof is by well-founded induction. *)
-
--- (** To compute the fixpoint effectively,
---   we need to use Sigma-types [ { x : A | P x } ]
---   instead of "there exists" quantifiers [ exists x : A, P x ]. *)
-
--- Lemma fixpoint_exists_2: { x : A | eq x (F x) }.
--- Proof.
---   assert(REC: forall x, le x (F x) -> { y : A | eq y (F y) } ).
---   {
---     induction x using (Fix gt_wf).
---     intros LE.
---     set (x' := F x).
---     destruct (beq x x') eqn:EQ.
---     - exists x. apply beq_eq. auto.
---     - apply X with x'.
---       + split. apply LE. apply beq_neq. auto.
---       + apply F_mon. apply LE.
---   }
---   apply REC with (x := bot). apply bot_smallest.
--- Defined.
-
--- (** Now we can extract the value of the fixpoint we found,
---   and a proof that it is a fixpoint. *)
-
--- Definition fixpoint_2 : A := proj1_sig fixpoint_exists_2.
-
--- Lemma fixpoint_2_correct: eq fixpoint_2 (F fixpoint_2).
--- Proof.
---   unfold fixpoint_2. apply proj2_sig.
--- Qed.
-
--- (** However, since the program [fixpoint_exists_2] was synthesized by
---   Coq's proof tactics, we don't know exactly what algorithm is used to
---   compute the fixpoint, and whether it is efficient.  We can look at
---   the term that Coq synthesized, but it's completely unreadable! *)
--- (*
--- Print fixpoint_exists_2.
--- *)
-
--- (** Alternatively, we can use the [Program Fixpoint] mechanism to
---   write the iteration algorithm explicitly, leaving holes ``[_]''
---   where proofs are needed.  [Program Fixpoint] then drops into
---   interactive proof mode to let us construct those proofs.  *)
-
--- (** The algorithm is simple: we iterate [F] starting from a pre-fixpoint [x].
-
--- The [iterate] function takes as argument not just [x], but also two proofs:
--- - that [x] is a pre-fixpoint, i.e. [le x (F x)]
--- - that [x] is below any post-fixpoint [z].
-
--- Likewise, it returns as result not just the fixpoint [y], but also two proofs:
--- - that [y] is a fixpoint, i.e. [eq y (F y)]
--- - that [y] is below any post-fixpoint [z].
--- *)
-
-
-  -- let x' := F x in
-  -- match beq x x' with
-  -- | true  => x
-  -- | false => iterate x' _ _
-  -- end.
-
-def iterate (x : α) (PRE: le x (F x)) (SMALL: forall z, le (F z) z -> le x z) : α :=
+@[grind] def iterate (x : α) (PRE: le x (F x)) (SMALL: forall z, le (F z) z -> le x z) : α :=
   if beq x (F x) then x else iterate (F x) (by apply OrderStruct.F_mon; exact PRE) (by intro z hyp; specialize SMALL z hyp; apply le_trans; apply F_mon; exact SMALL; exact hyp)
 termination_by x
 decreasing_by
@@ -129,49 +52,33 @@ decreasing_by
   unfold gt
   grind [OrderStruct.beq_false]
 
-theorem iterate_correct (x : α) (PRE: le x (F x)) (SMALL: forall z, le (F z) z -> le x z) (heq : y = iterate α x PRE SMALL ) : eq y (F y) ∧ ∀ z, le (F z) z → le x z := by
+@[grind] theorem iterate_correct (x : α) (PRE: le x (F x)) (SMALL: forall z, le (F z) z -> le x z) (heq : y = iterate _ x PRE SMALL ) : eq y (F y) ∧ ∀ z, le (F z) z → le y z := by
   fun_induction iterate
   case case1 x' PRE SMALL isTrue  =>
     constructor
     . rw [←heq] at PRE
       grind [OrderStruct.beq_true]
-    . exact SMALL
+    . intro z hyp
+      specialize SMALL z hyp
+      grind
   case case2 ih =>
     have := @ih heq
     grind
 
--- Program Fixpoint iterate
---     (x: A) (PRE: le x (F x)) (SMALL: forall z, le (F z) z -> le x z)
---     {wf gt x}
---     : {y : A | eq y (F y) /\ forall z, le (F z) z -> le y z } :=
---   let x' := F x in
---   match beq x x' with
---   | true  => x
---   | false => iterate x' _ _
---   end.
--- (** All proof obligations corresponding to ``holes'' were solved automatically,
---   except one: that the argument [x'] to the recursive call is strictly
---   greater than the parameter [x].  This we prove interactively.
--- *)
--- Next Obligation.
---   split.
--- - auto.
--- - apply beq_neq. auto.
--- Qed.
+@[grind] def fixpoint : α := iterate α bot (by apply bot_smallest) (by intro z pre; apply bot_smallest)
 
--- (** The fixpoint is obtained by iterating from [bot]. *)
+theorem fixpoint_correct : inst.eq (@fixpoint α _) (F (@fixpoint _ _)) /\ forall z : α , le (F z) z -> le (@fixpoint _ _) z := by
+  unfold fixpoint
+  have PRE : inst.le (bot) (F bot) := by apply bot_smallest
+  have SMALL : ∀ z, le (F z) z -> inst.le bot z := by
+    intro z hyp
+    apply le_trans
+    rotate_left
+    . exact hyp
+    . apply bot_smallest
+  have := @iterate_correct α inst (iterate α bot PRE SMALL) bot PRE SMALL (rfl)
+  grind
 
--- Program Definition fixpoint : A := iterate bot _ _.
-
--- (** It is therefore both a fixpoint and the smallest post-fixpoint. *)
-
--- Theorem fixpoint_correct:
---   eq fixpoint (F fixpoint) /\ forall z, le (F z) z -> le fixpoint z.
--- Proof.
---   unfold fixpoint. apply proj2_sig.
--- Qed.
-
--- End FIXPOINT.
 
 -- (** ** 9.2 Application to constant propagation analysis *)
 
