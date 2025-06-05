@@ -1,6 +1,19 @@
+import «Leroy».Imp
+import «Leroy».Constprop
+import Init.Prelude
+import Init.Data.List.Basic
+import Std.Data.HashMap
+import Std.Data.HashMap.Lemmas
+import Init.Data.List.Sublist
+import Init.WF
+import Batteries.Data.List.Basic
+import Batteries.Data.List.Perm
+import Init.Data.List.Pairwise
+universe u
+
 set_option grind.warning false
 
-universe u
+section Fixpoints
 
 @[grind] class OrderStruct (α : Sort u) where
   eq : α → α → Prop
@@ -8,11 +21,11 @@ universe u
   beq : α → α → Bool
   beq_true : ∀ x y : α, beq x y = true → eq x y
   beq_false : ∀ x y : α, beq x y = false → ¬ eq x y
-  bot : α
-  bot_smallest : ∀ x, le bot x
   F : α → α
   F_mon: ∀ x y, le x y -> le (F x) (F y)
   le_trans: ∀ x y z, le x y -> le y z -> le x z
+  bot : α
+  bot_smallest : ∀ x, le bot x
 open OrderStruct
 
 @[grind] def gt {α : Sort u} [OrderStruct α] (x y : α ) := le y x ∧ ¬eq y x
@@ -65,10 +78,10 @@ decreasing_by
     have := @ih heq
     grind
 
-@[grind] def fixpoint : α := iterate α bot (by apply bot_smallest) (by intro z pre; apply bot_smallest)
+@[grind] def fixpoint' : α := iterate α bot (by apply bot_smallest) (by intro z pre; apply bot_smallest)
 
-theorem fixpoint_correct : inst.eq (@fixpoint α _) (F (@fixpoint _ _)) /\ forall z : α , le (F z) z -> le (@fixpoint _ _) z := by
-  unfold fixpoint
+theorem fixpoint_correct : inst.eq (@fixpoint' α _) (F (@fixpoint' _ _)) /\ forall z : α , le (F z) z -> le (@fixpoint' _ _) z := by
+  unfold fixpoint'
   have PRE : inst.le (bot) (F bot) := by apply bot_smallest
   have SMALL : ∀ z, le (F z) z -> inst.le bot z := by
     intro z hyp
@@ -79,121 +92,110 @@ theorem fixpoint_correct : inst.eq (@fixpoint α _) (F (@fixpoint _ _)) /\ foral
   have := @iterate_correct α inst (iterate α bot PRE SMALL) bot PRE SMALL (rfl)
   grind
 
+end Fixpoints
 
--- (** ** 9.2 Application to constant propagation analysis *)
+@[grind] def Eq' (S1 S2 : Store) : Prop := Equal S1 S2
 
--- (** First, we equip the type of abstract stores with the required equality
---   and ordering predicates.  [le] and [beq] are defined in [Constprop],
---   under the names [le'] and [equal']. *)
+def Eq'_sym : ∀ S1 S2, Eq' S1 S2 → Eq' S2 S1 := by
+  intro S1 S2 hyp
+  unfold Eq' Equal at *
+  grind [Std.HashMap.Equiv.symm]
 
--- Definition Eq (S1 S2: Store) : Prop :=
---   IdentMap.Equal S1 S2.
+@[grind] theorem Equal_Eq' : ∀ S1 S2, (Equal S1 S2 == true) → Eq' S1 S2 := by grind
 
--- Lemma Eq_sym: forall S1 S2, Eq S1 S2 -> Eq S2 S1.
--- Proof.
---   intros. apply IMFact.Equal_sym. auto.
--- Qed.
+@[grind] theorem Equal_nEq : ∀ S1 S2, (Equal S1 S2 == false) → ¬Eq' S1 S2 := by grind
 
--- Lemma Equal_Eq: forall S1 S2, Equal S1 S2 = true -> Eq S1 S2.
--- Proof.
---   intros. unfold Eq. apply <- IMFact.Equal_Equivb.
---   apply IdentMap.equal_2. eauto. apply Z.eqb_eq.
--- Qed.
+@[grind] theorem Eq_Le : ∀ S1 S2, Eq' S1 S2 → Le S1 S2 := by
+  intro S1 S2 heq
+  unfold Le
+  intro x n heq2
+  unfold Eq' Equal  at heq
+  simp at *
+  grind [Std.HashMap.Equiv.getElem?_eq]
 
--- Lemma Equal_nEq: forall S1 S2, Equal S1 S2 = false -> ~ Eq S1 S2.
--- Proof.
---   intros. unfold Eq. intros IE.
---   assert (Equal S1 S2 = true).
---   { apply IdentMap.equal_1. apply IMFact.Equal_Equivb. apply Z.eqb_eq. auto. }
---   congruence.
--- Qed.
+@[grind] theorem Le_trans : ∀ S1 S2 S3, Le S1 S2 → Le S2 S3 → Le S1 S3 := by grind
 
--- Lemma Eq_Le: forall S1 S2, Eq S1 S2 -> Le S1 S2.
--- Proof.
---   unfold Eq, Le; intros. rewrite H; auto.
--- Qed.
+@[grind] def Gt (S1 S2 : Store) := Le S2 S1 ∧ ¬ Eq' S2 S1
 
--- Lemma Le_trans: forall S1 S2 S3, Le S1 S2 -> Le S2 S3 -> Le S1 S3.
--- Proof.
---   unfold Le; auto.
--- Qed.
+@[grind] def Increasing (F : Store → Store) := ∀ x y, Le x y → Le (F x) (F y)
 
--- Definition Gt (S1 S2: Store) := Le S2 S1 /\ ~ Eq S2 S1.
+theorem hash_set_incl_size_leq (S1 S2 : Store) : Le S2 S1 → List.Subperm (S1.toList) (S2.toList) := by
+  intro LE
+  unfold Le at LE
+  apply List.subperm_of_subset
+  . apply List.Pairwise.imp
+    rotate_left
+    . exact Std.HashMap.distinct_keys_toList
+    . grind
+  . intro (k,v) mem
+    specialize LE k v (by grind)
+    grind
 
--- (** We will use monotonically increasing functions a lot. *)
+@[grind] theorem Le_cardinal:
+  ∀ S T : Store,
+  Le T S ->
+  S.size <= T.size ∧ (S.size = T.size → Equal S T) := by
+    intro S T hyp
+    have size_eq : ∀ (S : Store), S.size = S.toList.length := by grind [Std.HashMap.length_toList]
+    rw [size_eq S, size_eq T]
+    constructor
+    case left =>
+      exact List.Subperm.length_le (hash_set_incl_size_leq S T hyp)
+    case right =>
+      intro eqLen
+      unfold Equal
+      apply Std.HashMap.Equiv.of_toList_perm
+      apply List.Subperm.perm_of_length_le (hash_set_incl_size_leq S T hyp)
+      grind
 
--- Definition Increasing (F: Store -> Store) : Prop :=
---   forall x y, Le x y -> Le (F x) (F y).
+@[grind] theorem Gt_cardinal:
+  forall S S', Gt S S' -> S.size < S'.size := by
+    intro S S' hyp
+    unfold Gt at hyp
+    have ⟨ t₁, t₂ ⟩ := @Le_cardinal S S' (hyp.1)
+    apply Nat.lt_of_le_of_ne
+    case h₁ => exact t₁
+    case h₂ =>
+      apply Classical.byContradiction
+      intro h
+      simp at h
+      grind
 
--- (** The really hard proof is to show that the strict order [Gt] is
---   well-founded.  For this we reason on the cardinal of the finite maps
---   representing abstract stores, that is, the number of [x = n] facts
---   contained in abstract stores. *)
-
--- Lemma Le_cardinal:
---   forall S T,
---   Le T S ->
---   IdentMap.cardinal S <= IdentMap.cardinal T
---   /\ (IdentMap.cardinal S = IdentMap.cardinal T -> IdentMap.Equal T S).
--- Proof.
---   induction S using IMProp.map_induction.
---   - intros. rewrite IMProp.cardinal_1 by auto. split.
---     + lia.
---     + intros.
---       assert (IdentMap.Empty T) by (apply IMProp.cardinal_inv_1; auto).
---       apply IMFact.Equal_mapsto_iff. intros.
---       specialize (H k e); specialize (H2 k e). tauto.
---   - intros T2 LE.
---     set (T1 := IdentMap.remove x T2).
---     assert (~ IdentMap.In x T1).
---     { apply IdentMap.remove_1; auto. }
---     assert (IMProp.Add x e T1 T2).
---     { intros y. unfold T1. rewrite IMFact.add_o, IMFact.remove_o.
---       destruct (IMProp.F.eq_dec x y); auto.
---       subst x. apply LE. rewrite H0. apply IMFact.add_eq_o. auto. }
---     assert (Le T1 S1).
---     { red; intros. unfold T1; rewrite IMFact.remove_o.
---       destruct (IMProp.F.eq_dec x x0).
---       subst x0. exfalso; apply H. apply IMFact.in_find_iff. congruence.
---       apply LE. rewrite H0. rewrite IMFact.add_neq_o; auto.
---     }
---     rewrite (@IMProp.cardinal_2 _ S1 S2 x e) by auto.
---     rewrite (@IMProp.cardinal_2 _ T1 T2 x e) by auto.
---     destruct (IHS1 T1) as [A B]; auto.
---     split.
---     + lia.
---     + intros.
---       assert (IdentMap.Equal T1 S1) by (apply B; lia).
---       intros y. rewrite H0, H2. rewrite ! IMFact.add_o.
---       destruct (IMProp.F.eq_dec x y); auto.
--- Qed.
-
--- Lemma Gt_cardinal:
---   forall S S', Gt S S' -> IdentMap.cardinal S < IdentMap.cardinal S'.
--- Proof.
---   intros S S' [LE NEQ].
---   edestruct Le_cardinal as [A B]. eauto.
---   assert (IdentMap.cardinal S <> IdentMap.cardinal S').
---   { intros EQ; apply NEQ; apply B; auto. }
---   lia.
--- Qed.
-
--- Lemma Gt_wf: well_founded Gt.
--- Proof.
---   apply wf_incl with (ltof Store (@IdentMap.cardinal Z)).
---   - intros S S' GT. apply Gt_cardinal; auto.
---   - apply well_founded_ltof.
--- Qed.
-
--- (** Another difficulty is that our type of abstract stores does not have
---   a smallest element [bot].  But for the kind of functions we take fixpoints of,
---   we know a pre-fixpoint we can start iterating with. *)
+theorem Gt_wf : WellFounded Gt := by
+  have := @InvImage Store Nat Nat.lt fun x => x.size
+  have : ∀ (x y : Store), Gt x y → @InvImage Store Nat Nat.lt (fun x => x.size) x y := by
+    intro x y heq
+    unfold InvImage
+    simp
+    apply Gt_cardinal
+    exact heq
+  have subrel : Subrelation Gt (InvImage Nat.lt (fun x : Store => x.size)) := by
+    intro x y gt; grind
+  apply @Subrelation.wf Store (InvImage Nat.lt (fun x : Store => x.size)) Gt subrel
+  exact InvImage.wf (fun x : Store => x.size) (Nat.lt_wfRel.wf)
 
 -- Section FIXPOINT_JOIN.
 
 -- Variable Init: Store.
 -- Variable F: Store -> Store.
 -- Hypothesis F_incr: Increasing F.
+
+-- instance : WellFoundedOrderStruct Store where
+--   eq := Eq'
+--   le := Le
+--   beq := fun x y => decide (Equal x y)
+--   beq_true := fun x y hyp => Equal_Eq' x y (by grind)
+--   beq_false := fun x y hyp => Equal_nEq x y (by grind)
+--   bot := sorry
+--   bot_smallest := sorry
+--   F := sorry
+--   F_mon := sorry
+--   le_trans := Le_trans
+--   gt_wf := Gt_wf
+
+
+-- def fixpoint_join (Init : Store) (F : Store → Store) (F_incr : Increasing F) : Store := by
+--   have := @iterate Store
 
 -- Program Definition fixpoint_join : Store :=
 --   iterate Store Eq Equal Equal_Eq Equal_nEq Le Le_trans Gt_wf
@@ -240,79 +242,33 @@ theorem fixpoint_correct : inst.eq (@fixpoint α _) (F (@fixpoint _ _)) /\ foral
 --   static analyzer.  But we are in for a surprise!
 -- *)
 
--- Fail Fixpoint Cexec (S: Store) (c: com) : Store :=
---   match c with
---   | SKIP => S
---   | ASSIGN x a => Update x (Aeval S a) S
---   | SEQ c1 c2 => Cexec (Cexec S c1) c2
---   | IFTHENELSE b c1 c2 =>
---       match Beval S b with
---       | Some true => Cexec S c1
---       | Some false => Cexec S c2
---       | None => Join (Cexec S c1) (Cexec S c2)
---       end
---   | WHILE b c1 =>
---       fixpoint_join S (fun x => Cexec x c1) _
---   end.
+theorem Join_increasing:
+  forall S1 S2 S3 S4,
+  Le S1 S2 -> Le S3 S4 -> Le (Join S1 S3) (Join S2 S4) := by
+    intros
+    grind
 
--- (** It says:
---   "Cannot infer this placeholder of type [Increasing (fun x : Store => Cexec x c1)]".
---   Of course!  We can only take fixpoints of increasing functions!
+@[grind] theorem Aeval_increasing: ∀ S1 S2, Le S1 S2 ->
+  forall a n, Aeval S2 a = .some n -> Aeval S1 a =.some n := by
+    intro S1 S2 LE a
+    induction a <;> grind
 
---   So, we need to find a way to define the [Cexec] function and SIMULTANEOUSLY
---   show that it is increasing.
+theorem Beval_increasing : forall S1 S2, Le S1 S2 ->
+  forall b n, Beval S2 b = .some n -> Beval S1 b = .some n := by
+    intro S1 S2 LE b
+    induction b
+    any_goals grind
+    case NOT b1 b1_ih =>
+      intro n ev
+      simp [Beval, lift1] at ev
+      grind
 
---   This can be done, but we'll need a lot of lemmas about increasing
---   functions first.
--- *)
+theorem Update_increasing:
+  forall S1 S2 x a,
+  Le S1 S2 ->
+  Le (Update x (Aeval S1 a) S1) (Update x (Aeval S2 a) S2) := by
+    intros; grind
 
--- Lemma Join_increasing:
---   forall S1 S2 S3 S4,
---   Le S1 S2 -> Le S3 S4 -> Le (Join S1 S3) (Join S2 S4).
--- Proof.
---   unfold Le; intros. rewrite Join_characterization in *. destruct H1; split; auto.
--- Qed.
-
--- Lemma Aeval_increasing:
---   forall S1 S2, Le S1 S2 ->
---   forall a n, Aeval S2 a = Some n -> Aeval S1 a = Some n.
--- Proof.
---   intros S1 S2 LE; induction a; cbn; intros.
--- - auto.
--- - apply LE; auto.
--- - destruct (Aeval S2 a1), (Aeval S2 a2); cbn in H; inv H.
---   erewrite IHa1, IHa2 by eauto. auto.
--- - destruct (Aeval S2 a1), (Aeval S2 a2); cbn in H; inv H.
---   erewrite IHa1, IHa2 by eauto. auto.
--- Qed.
-
--- Lemma Beval_increasing:
---   forall S1 S2, Le S1 S2 ->
---   forall b n, Beval S2 b = Some n -> Beval S1 b = Some n.
--- Proof.
---   intros S1 S2 LE; induction b; cbn; intros.
--- - auto.
--- - auto.
--- - destruct (Aeval S2 a1) eqn:A1, (Aeval S2 a2) eqn:A2; cbn in H; inv H.
---   erewrite ! Aeval_increasing by eauto. auto.
--- - destruct (Aeval S2 a1) eqn:A1, (Aeval S2 a2) eqn:A2; cbn in H; inv H.
---   erewrite ! Aeval_increasing by eauto. auto.
--- - destruct (Beval S2 b); cbn in H; inv H.
---   erewrite IHb by eauto. auto.
--- - destruct (Beval S2 b1), (Beval S2 b2); cbn in H; inv H.
---   erewrite IHb1, IHb2 by eauto. auto.
--- Qed.
-
--- Lemma Update_increasing:
---   forall S1 S2 x a,
---   Le S1 S2 ->
---   Le (Update x (Aeval S1 a) S1) (Update x (Aeval S2 a) S2).
--- Proof.
---   intros; unfold Le; intros.
---   rewrite Update_characterization in *.
---   destruct (string_dec x x0); auto.
---   subst x0. apply Aeval_increasing with S2; auto.
--- Qed.
 
 -- Lemma fixpoint_Join_increasing:
 --   forall F (F_incr: Increasing F) S1 S2,

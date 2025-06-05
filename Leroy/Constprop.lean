@@ -52,12 +52,12 @@ set_option grind.warning false
 @[grind] theorem mk_PLUS_CONST_sound:
   forall s a n, aeval s (mk_PLUS_CONST a n) = aeval s a + n := by
     intro s a n
-    fun_cases mk_PLUS_CONST <;> grind
+    fun_cases mk_PLUS_CONST a n <;> grind
 
 theorem mk_PLUS_sound:
   forall s a1 a2, aeval s (mk_PLUS a1 a2) = aeval s a1 + aeval s a2 := by
     intro s a1 a2
-    fun_cases mk_PLUS
+    fun_cases mk_PLUS a1 a2
     <;> (try (simp [aeval]) ; try (simp [mk_PLUS_CONST_sound ]) ; grind)
     next m _ =>
       grind
@@ -172,7 +172,8 @@ theorem matches_Le: forall s S1 S2, Le S1 S2 -> matches' s S1 -> matches' s S2 :
   grind
 
 theorem Le_Top: forall S, Le S Top := by
-  intro S
+  unfold Le Top
+  intros
   grind [Std.HashMap]
 
 @[grind] theorem Join_characterization:

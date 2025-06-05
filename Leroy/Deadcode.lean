@@ -16,7 +16,7 @@ set_option grind.warning false
 
 @[grind] noncomputable instance (a b : IdentSet) : Decidable (a ⊆ b) := Classical.propDecidable (a ⊆ b)
 
-@[grind] noncomputable instance (x : ident) (a: IdentSet) : Decidable (x ∈ a) := Classical.propDecidable (x ∈ a)
+@[grind] instance (x : ident) (a: IdentSet) : Decidable (x ∈ a) := Std.HashSet.instDecidableMem
 
 @[grind] instance : EmptyCollection IdentSet where
   emptyCollection := Std.HashSet.emptyWithCapacity
