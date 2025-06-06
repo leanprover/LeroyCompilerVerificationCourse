@@ -298,15 +298,11 @@ theorem matches_update: forall s S x n N,
   | fuel + 1 =>
       let S' := F S
       if Equal S' S then S else fixpoint_rec F fuel S'
--- (** Let's say that we will do at most 20 iterations. *)
 
 @[grind] def num_iter : Nat := 20
 
 @[grind] noncomputable def fixpoint (F: Store -> Store) (init_S: Store) : Store :=
   fixpoint_rec F num_iter init_S
-
--- (** The result [S] of [fixpoint F] is sound, in that it satisfies
---     [F S <= S] in the lattice ordering. *)
 
 theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint F init_S) :
   Le (F S) S := by
@@ -332,7 +328,7 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
       | .some true => Cexec S c1
       | .some false => Cexec S c2
       | .none => Join (Cexec S c1) (Cexec S c2)
-  | .WHILE b c1 =>
+  | .WHILE _ c1 =>
       fixpoint (fun x => Join S (Cexec x c1)) S
 
 @[grind] theorem Cexec_sound:

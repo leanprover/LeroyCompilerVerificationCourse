@@ -1,14 +1,15 @@
 import «Leroy».Imp
 import «Leroy».Constprop
-import Init.Prelude
-import Init.Data.List.Basic
+import Init.WF
 import Std.Data.HashMap
 import Std.Data.HashMap.Lemmas
-import Init.Data.List.Sublist
-import Init.WF
 import Batteries.Data.List.Basic
 import Batteries.Data.List.Perm
 import Init.Data.List.Pairwise
+import Init.Data.List.Sublist
+import Init.Data.List.Basic
+
+
 universe u
 
 set_option grind.warning false
@@ -28,7 +29,7 @@ section Fixpoints
   bot_smallest : ∀ x, le bot x
 open OrderStruct
 
-@[grind] def gt {α : Sort u} [OrderStruct α] (x y : α ) := le y x ∧ ¬eq y x
+@[grind] def gt {α : Sort u} [OrderStruct α] (x y : α) := le y x ∧ ¬eq y x
 
 @[grind] class WellFoundedOrderStruct (α : Sort u) extends OrderStruct α where
   gt_wf : WellFounded (@gt α _)
@@ -174,6 +175,7 @@ theorem Gt_wf : WellFounded Gt := by
   apply @Subrelation.wf Store (InvImage Nat.lt (fun x : Store => x.size)) Gt subrel
   exact InvImage.wf (fun x : Store => x.size) (Nat.lt_wfRel.wf)
 
+
 -- Section FIXPOINT_JOIN.
 
 -- Variable Init: Store.
@@ -253,7 +255,7 @@ theorem Join_increasing:
     intro S1 S2 LE a
     induction a <;> grind
 
-theorem Beval_increasing : forall S1 S2, Le S1 S2 ->
+theorem Beval_increasing : ∀ S1 S2, Le S1 S2 ->
   forall b n, Beval S2 b = .some n -> Beval S1 b = .some n := by
     intro S1 S2 LE b
     induction b
