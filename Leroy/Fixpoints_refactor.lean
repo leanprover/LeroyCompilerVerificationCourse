@@ -210,6 +210,7 @@ noncomputable instance : OrderStruct Store where
   gt_wf := Gt_wf
 end Constprop
 
+section FixpointJoin
 variable (Init : Store)
 variable (F : Store → Store) [Monotone Store F]
 
@@ -239,3 +240,115 @@ noncomputable def fixpoint_join : Store := by
   intro x n hyp2
   specialize hyp x n hyp2
   grind
+
+@[grind] theorem Join_increasing:
+  forall S1 S2 S3 S4,
+  Le S1 S2 -> Le S3 S4 -> Le (Join S1 S3) (Join S2 S4) := by
+    intros
+    grind
+
+@[grind] theorem Aeval_increasing: ∀ S1 S2, Le S1 S2 ->
+  forall a n, Aeval S2 a = .some n -> Aeval S1 a =.some n := by
+    intro S1 S2 LE a
+    induction a <;> grind
+
+@[grind] theorem Beval_increasing : ∀ S1 S2, Le S1 S2 ->
+  forall b n, Beval S2 b = .some n -> Beval S1 b = .some n := by
+    intro S1 S2 LE b
+    induction b
+    any_goals grind
+    case NOT b1 b1_ih =>
+      intro n ev
+      simp [Beval, lift1] at ev
+      grind
+
+theorem Update_increasing:
+  forall S1 S2 x a,
+  Le S1 S2 ->
+  Le (Update x (Aeval S1 a) S1) (Update x (Aeval S2 a) S2) := by
+    intros; grind
+
+end FixpointJoin
+
+noncomputable instance wrapper (F : Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) : Monotone Store F where
+  F_mon := by grind
+
+noncomputable def fixpoint_join' (S : Store) (F: Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) := by
+  have := wrapper F (by grind)
+  exact fixpoint_join S F
+
+theorem fixpoint_join_increasing (S : Store) (F: Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) (S1 S2: Store) : le S1 S2 → le (fixpoint_join' S1 F F_mon) (fixpoint_join' S2 F F_mon) := by
+  intro hyp
+  unfold fixpoint_join'
+  simp
+  sorry
+
+noncomputable def Cexec' (c: com) : {F : Store → Store // ∀ x y, le x y → le (F x) (F y)} := by
+  induction c
+  case SKIP =>
+    constructor
+    case val =>
+      exact (fun S => S)
+    case property =>
+      grind
+  case ASSIGN x a =>
+    constructor
+    case val =>
+      exact (fun S => Update x (Aeval S a) S)
+    case property =>
+      intro x y hyp
+      simp
+      apply Update_increasing
+      . exact hyp
+  case SEQ c1 c2 c1_ih c2_ih =>
+    have ⟨ f₁, mon₁ ⟩ := c1_ih
+    have ⟨ f₂, mon₂ ⟩ := c2_ih
+    constructor
+    case val =>
+      exact (fun S => f₂ (f₁ S))
+    case property =>
+      grind
+  case IFTHENELSE b c1 c2 c1_ih c2_ih =>
+    have ⟨ f₁, mon₁ ⟩ := c1_ih
+    have ⟨ f₂, mon₂ ⟩ := c2_ih
+    constructor
+    case val =>
+      exact (fun S =>
+      match Beval S b with
+      | .some true => f₁ S
+      | .some false => f₂ S
+      | .none => Join (f₁ S) (f₂ S)
+      )
+    case property =>
+      intro x y hyp
+      simp
+      generalize heq : Beval y b = h
+      cases h
+      case none =>
+        simp [heq]
+        apply le_trans
+        rotate_right
+        . exact Join (f₁ x) (f₂ x)
+        rotate_left
+        . apply Join_increasing
+          . apply mon₁
+            . exact hyp
+          . apply mon₂
+            . exact hyp
+        intro id val hyp2
+        have := (Join_characterization (f₁ x) (f₂ x) id val).1 hyp2
+        split <;> grind
+      case some val =>
+        have := Beval_increasing x y hyp b val heq
+        split <;> grind
+  case WHILE b c1 c1_ih =>
+    constructor
+    case val =>
+      have ⟨ f₁, mon₁ ⟩ := c1_ih
+      exact fun S => fixpoint_join' S f₁ mon₁
+    case property =>
+      simp
+      intro x y hyp
+      apply fixpoint_join_increasing
+      . exact x
+      . exact hyp
