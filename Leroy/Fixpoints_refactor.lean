@@ -241,6 +241,36 @@ noncomputable def fixpoint_join : Store := by
   specialize hyp x n hyp2
   grind
 
+theorem fixpoint_join_eq: Eq' (Join Init (F (fixpoint_join Init F) )) (fixpoint_join Init F) := by
+  generalize heq1 : fixpoint_join Init F = t
+  simp [fixpoint_join] at *
+  apply Eq'_sym
+  unfold iterate at heq1
+  split at heq1
+  case a.isTrue h =>
+    rw [←heq1]
+    exact instOrderStructStore.beq_true' Init (Join Init (F Init)) h
+  case a.isFalse =>
+    sorry
+
+
+-- Lemma fixpoint_join_sound:
+--   Le Init fixpoint_join /\ Le (F fixpoint_join) fixpoint_join.
+-- Proof.
+--   assert (LE: Le (Join Init (F fixpoint_join)) fixpoint_join).
+--   { apply Eq_Le. apply fixpoint_join_eq. }
+--   split.
+-- - eapply Le_trans. apply Le_Join_l. eauto.
+-- - eapply Le_trans. apply Le_Join_r. eauto.
+-- Qed.
+
+-- Lemma fixpoint_join_smallest:
+--   forall S, Le (Join Init (F S)) S -> Le fixpoint_join S.
+-- Proof.
+--   unfold fixpoint_join. destruct iterate as (X & EQ & SMALL).
+--   auto.
+
+
 @[grind] theorem Join_increasing:
   forall S1 S2 S3 S4,
   Le S1 S2 -> Le S3 S4 -> Le (Join S1 S3) (Join S2 S4) := by
@@ -352,3 +382,9 @@ noncomputable def Cexec' (c: com) : {F : Store → Store // ∀ x y, le x y → 
       apply fixpoint_join_increasing
       . exact x
       . exact hyp
+
+noncomputable def Cexec_Constprop (c : com) : Store → Store := (Cexec' c).val
+instance (c : com) : Monotone Store (Cexec_Constprop c) where
+  F_mon := by
+    intro x y hyp
+    exact (Cexec' c).property x y hyp
