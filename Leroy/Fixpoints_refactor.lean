@@ -243,33 +243,55 @@ noncomputable def fixpoint_join : Store := by
 
 theorem fixpoint_join_eq: Eq' (Join Init (F (fixpoint_join Init F) )) (fixpoint_join Init F) := by
   generalize heq1 : fixpoint_join Init F = t
-  simp [fixpoint_join] at *
   apply Eq'_sym
-  unfold iterate at heq1
-  split at heq1
-  case a.isTrue h =>
-    rw [←heq1]
-    exact instOrderStructStore.beq_true' Init (Join Init (F Init)) h
-  case a.isFalse =>
-    sorry
+  simp [fixpoint_join] at *
+  have := (@iterate_correct Store _ (fun x => Join Init (F x)) _ ?_ ?_ ?_ ?_ ?_ ).1
+  unfold Eq'
+  . exact this
+  . exact Init
+  . dsimp
+    apply Le_Join_l
+  . intro z hyp
+    unfold le instOrderStructStore
+    dsimp
+    unfold Le
+    intro x n hyp2
+    specialize hyp x n hyp2
+    grind
+  . rw [heq1]
 
+theorem fixpoint_join_sound : Le Init (fixpoint_join Init F) /\ Le (F (fixpoint_join Init F)) (fixpoint_join Init F) := by
+  have LE : Le (Join Init (F (fixpoint_join Init F))) (fixpoint_join Init F) := by
+    apply Eq_Le
+    apply fixpoint_join_eq
+  constructor
+  . apply Le_trans
+    rotate_left
+    . exact LE
+    . apply Le_Join_l
+  . apply Le_trans
+    rotate_left
+    . exact LE
+    . apply Le_Join_r
 
--- Lemma fixpoint_join_sound:
---   Le Init fixpoint_join /\ Le (F fixpoint_join) fixpoint_join.
--- Proof.
---   assert (LE: Le (Join Init (F fixpoint_join)) fixpoint_join).
---   { apply Eq_Le. apply fixpoint_join_eq. }
---   split.
--- - eapply Le_trans. apply Le_Join_l. eauto.
--- - eapply Le_trans. apply Le_Join_r. eauto.
--- Qed.
-
--- Lemma fixpoint_join_smallest:
---   forall S, Le (Join Init (F S)) S -> Le fixpoint_join S.
--- Proof.
---   unfold fixpoint_join. destruct iterate as (X & EQ & SMALL).
---   auto.
-
+theorem fixpoint_join_smallest:
+  forall S, Le (Join Init (F S)) S -> Le (fixpoint_join Init F) S := by
+    intro S LE
+    unfold fixpoint_join
+    dsimp
+    have := (@iterate_correct Store _ (fun x => Join Init (F x)) _ (fixpoint_join Init F) Init (?_) ?_ ?_).2 S LE
+    exact this
+    . dsimp
+      apply Le_Join_l
+    . intro z hyp
+      unfold le instOrderStructStore
+      dsimp
+      unfold Le
+      intro x n hyp2
+      specialize hyp x n hyp2
+      grind
+    . unfold fixpoint_join
+      dsimp
 
 @[grind] theorem Join_increasing:
   forall S1 S2 S3 S4,
@@ -307,11 +329,30 @@ noncomputable def fixpoint_join' (S : Store) (F: Store → Store) (F_mon : ∀ x
   have := wrapper F (by grind)
   exact fixpoint_join S F
 
-theorem fixpoint_join_increasing (S : Store) (F: Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) (S1 S2: Store) : le S1 S2 → le (fixpoint_join' S1 F F_mon) (fixpoint_join' S2 F F_mon) := by
+theorem fixpoint_join_increasing (_ : Store) (F: Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) (S1 S2: Store) : le S1 S2 → le (fixpoint_join' S1 F F_mon) (fixpoint_join' S2 F F_mon) := by
   intro hyp
-  unfold fixpoint_join'
-  simp
-  sorry
+  apply @fixpoint_join_smallest S1 F (by grind [wrapper]) (fixpoint_join' S2 F F_mon)
+  generalize heq : fixpoint_join' S2 F F_mon = fix2
+  have : (Le (Join S2 (F fix2)) fix2) := by
+    apply Eq_Le
+    . have := @fixpoint_join_eq S2 F (by grind [wrapper])
+      rw [←heq]
+      apply this
+  apply Le_trans
+  rotate_left
+  . apply this
+  . apply Join_increasing
+    . exact hyp
+    . grind
+
+
+
+  -- set (fix2 := fixpoint_join S2 F F_incr).
+  -- assert (Le (Join S2 (F fix2)) fix2) by (apply Eq_Le; apply fixpoint_join_eq).
+  -- eapply Le_trans; eauto.
+  -- apply Join_increasing; auto. unfold Le; auto.
+
+
 
 noncomputable def Cexec' (c: com) : {F : Store → Store // ∀ x y, le x y → le (F x) (F y)} := by
   induction c
