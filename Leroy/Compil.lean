@@ -433,7 +433,6 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
           simp [compile_bexp, heq1, heq2] at h
           specialize b2_ih (by grind)
           simp [codelen_app]
-          -- Why is grind not working here?
           simp [Int.add_assoc] at *
           exact b2_ih
         case neg isFalse =>
@@ -494,7 +493,6 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
       apply this
     . by_cases beval s b = true
       case pos isTrue =>
-        -- The "then" branch is selected
         simp [isTrue]
         apply star_trans
         . apply ih
@@ -519,11 +517,9 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
         suffices h2 : code_at C (pc + codelen code3 + (codelen code1 + 1)) (compile_com c2) from by
           specialize ih h2
           simp [codelen_app, codelen_cons]
-          -- grind is failing here - same issue as miss 2
           have : (pc + codelen code3 + (codelen code1 + 1) + codelen (compile_com c2)) = (pc + (codelen code3 + (codelen code1 + (codelen code2 + 1)))) := by grind
           rw [this] at ih
           apply ih
-        -- In the last argument grind fails
         have := @code_at_app_right C pc (code3 ++ code1 ++ [instr.Ibranch (codelen code2)]) code2 (by simp[h])
         simp [codelen_app, codelen_singleton] at this
         rw [heq2]
@@ -660,14 +656,7 @@ theorem compile_cont_Kseq_inv (C : List instr) (c : com) (k :cont) (pc : Int) (s
     generalize h₂ : pc = a₂
     rw [h₁, h₂] at H
     induction H generalizing pc k
-    any_goals grind
-    case ccont_seq c' k' pc₂ pc₃ a₃ a₄ a₅ ih =>
-      exists pc₂
-      injection h₁
-      rename_i h₃ h₄
-      apply And.intro
-      . apply star.star_refl
-      . all_goals grind
+    all_goals grind
 
 theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont) (pc : Int) (s : store) (H : compile_cont C (.Kwhile b c k) pc):
   ∃ pc',

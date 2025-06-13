@@ -26,44 +26,9 @@ theorem cycle_infseq {R : α → α → Prop} (x : α) : R x x → infseq R x :=
   intros
   grind
 
--- Inductive predicate, as a inductive definition
 @[grind] inductive star (R : α → α → Prop) : α → α → Prop where
   | star_refl : ∀ x : α, star R x x
   | star_step : ∀ x y z, R x y → star R y z → star R x z
-
-def star2 (R : α → α → Prop) (m n : α) : Prop :=
-  m = n ∨ ∃ middle, R m middle ∧ star2 R middle n
-least_fixpoint
-
-theorem star2_star (R : α → α → Prop) (m n : α) : star2 R m n → star R m n
-:= by
-  have := @star2.fixpoint_induct _ R n (fun x => star R x n)
-  apply this
-  intro m
-  intro h
-  cases h
-  case y.inl eq =>
-    rw [eq]
-    apply star.star_refl
-  case y.inr h =>
-    apply Exists.elim h
-    intro middle
-    intro ⟨h₁, h₂⟩
-    apply star.star_step
-    exact h₁
-    exact h₂
-
-theorem star_star2 (R : α → α → Prop) (m n : α) : star R m n → star2 R m n := by
-  intro h
-  induction h
-  case star_refl =>
-    rw [star2]
-    left
-    rfl
-  case star_step x y z rel h₁ h₂ =>
-    rw [star2]
-    right
-    exists y
 
 @[grind] theorem star_one (R : α → α → Prop) : ∀ a b : α, R a b → star R a b := by
   intros a b Rab
@@ -163,6 +128,5 @@ theorem infseq_coinduction_principle_2:
       have t := plus_star_trans R a0 a1 mid h₃ h₅
       cases t
       any_goals grind
-
 
 @[grind] def irred (R : α → α → Prop) (a : α) : Prop := forall b, ¬(R a b)
