@@ -345,43 +345,26 @@ theorem fixpoint_join_increasing (_ : Store) (F: Store → Store) (F_mon : ∀ x
     . exact hyp
     . grind
 
-noncomputable def Cexec' (c: com) : {F : Store → Store // ∀ x y, le x y → le (F x) (F y)} := by
-  induction c
-  case SKIP =>
-    constructor
-    case val =>
-      exact (fun S => S)
-    case property =>
-      grind
-  case ASSIGN x a =>
-    constructor
-    case val =>
-      exact (fun S => Update x (Aeval S a) S)
-    case property =>
+noncomputable def Cexec' : (c : com) →  {F : Store → Store // ∀ x y, le x y → le (F x) (F y)}
+| .SKIP => ⟨(fun S => S), by grind⟩
+| .ASSIGN x a => ⟨(fun S => Update x (Aeval S a) S), by
       intro x y hyp
       simp
       apply Update_increasing
-      . exact hyp
-  case SEQ c1 c2 c1_ih c2_ih =>
-    have ⟨ f₁, mon₁ ⟩ := c1_ih
-    have ⟨ f₂, mon₂ ⟩ := c2_ih
-    constructor
-    case val =>
-      exact (fun S => f₂ (f₁ S))
-    case property =>
-      grind
-  case IFTHENELSE b c1 c2 c1_ih c2_ih =>
-    have ⟨ f₁, mon₁ ⟩ := c1_ih
-    have ⟨ f₂, mon₂ ⟩ := c2_ih
-    constructor
-    case val =>
-      exact (fun S =>
-      match Beval S b with
-      | .some true => f₁ S
-      | .some false => f₂ S
-      | .none => Join (f₁ S) (f₂ S)
-      )
-    case property =>
+      . exact hyp ⟩
+| .SEQ c1 c2 =>
+  let ⟨ f₁, mon₁ ⟩ := Cexec' c1
+  let ⟨ f₂, mon₂ ⟩ := Cexec' c2
+  ⟨ (fun S => f₂ (f₁ S)), by grind ⟩
+| .IFTHENELSE b c1 c2 =>
+  let ⟨ f₁, mon₁ ⟩ := Cexec' c1
+  let ⟨ f₂, mon₂ ⟩ := Cexec' c2
+  ⟨ (fun S =>
+    match Beval S b with
+    | .some true => f₁ S
+    | .some false => f₂ S
+    | .none => Join (f₁ S) (f₂ S)
+    ), by
       intro x y hyp
       simp
       generalize heq : Beval y b = h
@@ -402,18 +385,15 @@ noncomputable def Cexec' (c: com) : {F : Store → Store // ∀ x y, le x y → 
         split <;> grind
       case some val =>
         have := Beval_increasing x y hyp b val heq
-        split <;> grind
-  case WHILE b c1 c1_ih =>
-    constructor
-    case val =>
-      have ⟨ f₁, mon₁ ⟩ := c1_ih
-      exact fun S => fixpoint_join' S f₁ mon₁
-    case property =>
+        split <;> grind ⟩
+| .WHILE b c1 =>
+   let ⟨ f₁, mon₁ ⟩ := Cexec' c1
+   ⟨ fun S => fixpoint_join' S f₁ mon₁, by
       simp
       intro x y hyp
       apply fixpoint_join_increasing
       . exact x
-      . exact hyp
+      . exact hyp ⟩
 
 noncomputable def Cexec_Constprop (c : com) : Store → Store := (Cexec' c).val
 instance (c : com) : Monotone Store (Cexec_Constprop c) where
