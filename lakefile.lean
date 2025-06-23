@@ -1,7 +1,6 @@
 import Lake
 open Lake DSL
 require "leanprover-community" / "batteries" @ git "main"
-require "leanprover-community" / "mathlib"
 package «leroy» where
   -- add package configuration options here
 

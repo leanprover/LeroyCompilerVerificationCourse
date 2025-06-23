@@ -3,7 +3,7 @@ import «Leroy».Imp
 import Init.Data.List.Basic
 
 set_option grind.warning false
-set_option grind.debug true
+
 @[grind] inductive instr : Type where
   | Iconst (n: Int)
   | Ivar (x: ident)

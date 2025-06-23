@@ -3,10 +3,8 @@ import «Leroy».Imp
 import Init.Data.List.Basic
 import Std.Data.HashSet
 import Std.Data.HashSet.Lemmas
-open Classical in
-
-set_option grind.debug true
 set_option grind.warning false
+open Classical in
 
 @[grind] def IdentSet := Std.HashSet ident
   deriving Membership, Union, EmptyCollection
@@ -53,40 +51,40 @@ set_option grind.warning false
 @[grind] def fv_com (c: com) : IdentSet :=
   match c with
   | .SKIP => ∅
-  | .ASSIGN x a => fv_aexp a
+  | .ASSIGN _ a => fv_aexp a
   | .SEQ c1 c2 => (fv_com c1) ∪ (fv_com c2)
   | .IFTHENELSE b c1 c2 => (fv_bexp b) ∪ ((fv_com c1) ∪ (fv_com c2))
   | .WHILE b c => (fv_bexp b) ∪ (fv_com c)
 
-@[grind] noncomputable def fixpoint_rec (F : IdentSet → IdentSet) (default : IdentSet) (fuel: Nat) (x: IdentSet) : IdentSet :=
+@[grind] noncomputable def deadcode_fixpoint_rec (F : IdentSet → IdentSet) (default : IdentSet) (fuel: Nat) (x: IdentSet) : IdentSet :=
   match fuel with
   | 0 => default
   | fuel + 1 =>
       let x' := F x
-      if x' ⊆ x then x else fixpoint_rec F default fuel x'
+      if x' ⊆ x then x else deadcode_fixpoint_rec F default fuel x'
 
-@[grind] noncomputable def fixpoint (F : IdentSet → IdentSet) (default : IdentSet): IdentSet :=
-  fixpoint_rec F default 20 ∅
+@[grind] noncomputable def deadcode_fixpoint (F : IdentSet → IdentSet) (default : IdentSet): IdentSet :=
+  deadcode_fixpoint_rec F default 20 ∅
 
 @[grind] theorem  fixpoint_charact' (n : Nat) (x : IdentSet)  (F : IdentSet → IdentSet) (default : IdentSet):
-  ((F (fixpoint_rec F default n x)) ⊆ (fixpoint_rec F default n x)) ∨ (fixpoint_rec F default n x = default) := by
+  ((F (deadcode_fixpoint_rec F default n x)) ⊆ (deadcode_fixpoint_rec F default n x)) ∨ (deadcode_fixpoint_rec F default n x = default) := by
     induction n generalizing x <;> grind
 
 theorem fixpoint_charact (F : IdentSet → IdentSet) (default : IdentSet) :
-    ((F (fixpoint F default)) ⊆ (fixpoint F default)) ∨ (fixpoint F default = default) := by grind
+    ((F (deadcode_fixpoint F default)) ⊆ (deadcode_fixpoint F default)) ∨ (deadcode_fixpoint F default = default) := by grind
 
-theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F_stable : ∀ x , x ⊆ default -> (F x) ⊆ default): fixpoint F default ⊆ default := by
-  have : ∀ n : Nat, ∀ x : IdentSet, x ⊆ default → (fixpoint_rec F default n x) ⊆ default := by
+theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F_stable : ∀ x , x ⊆ default -> (F x) ⊆ default): deadcode_fixpoint F default ⊆ default := by
+  have : ∀ n : Nat, ∀ x : IdentSet, x ⊆ default → (deadcode_fixpoint_rec F default n x) ⊆ default := by
     intro n
     induction n
     case zero =>
       intro x contained
-      simp [fixpoint_rec]
+      simp [deadcode_fixpoint_rec]
       unfold Subset
       unfold instHasSubsetIdentSet
       grind
     case succ n ih =>
-      unfold fixpoint_rec
+      unfold deadcode_fixpoint_rec
       simp
       intro x hyp
       split
@@ -111,7 +109,7 @@ theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F
   | .WHILE b c =>
       let L' := (fv_bexp b) ∪  L
       let default := (fv_com (.WHILE b c)) ∪ L
-      fixpoint (fun x => L' ∪ (live c x)) default
+      deadcode_fixpoint (fun x => L' ∪ (live c x)) default
 
 theorem live_upper_bound:
   forall c L,

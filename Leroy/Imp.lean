@@ -1,8 +1,5 @@
 import «Leroy».Sequences
-
-set_option grind.debug true
 set_option grind.warning false
-
 
 def ident := String deriving BEq, Repr, Hashable
 
