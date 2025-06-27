@@ -1,5 +1,5 @@
-import «Leroy».Imp
-import «Leroy».Constprop
+import LeroyCompilerVerificationCourse.Imp
+import LeroyCompilerVerificationCourse.Constprop
 import Init.WF
 import Std.Data.HashMap
 import Std.Data.HashMap.Lemmas

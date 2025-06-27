@@ -1,4 +1,4 @@
-import «Leroy».Sequences
+import LeroyCompilerVerificationCourse.Sequences
 set_option grind.warning false
 
 def ident := String deriving BEq, Repr, Hashable
