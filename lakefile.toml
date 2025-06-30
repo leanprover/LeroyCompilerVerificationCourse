@@ -8,10 +8,6 @@ pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 autoImplicit = true
 
 [[require]]
-name = "mathlib"
-scope = "leanprover-community"
-
-[[require]]
 name = "batteries"
 git = "https://github.com/leanprover-community/batteries"
 rev = "v4.21.0-rc3"
