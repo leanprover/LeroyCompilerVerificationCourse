@@ -53,8 +53,8 @@ inductive plus (R : α → α → Prop) : α → α → Prop where
 theorem plus_one : ∀ a b, R a b → plus R a b := by
   intro a b Rab
   apply plus.plus_left
-  exact Rab
-  apply star.star_refl
+  · exact Rab
+  · grind
 
 @[grind] theorem plus_star : ∀ a b, plus R a b → star R a b := by
     intro a b h
@@ -79,11 +79,8 @@ theorem star_plus_trans:
       grind
     case star_step y a1 a2 =>
       apply plus.plus_left
-      . exact a1
-      . apply star_trans
-        exact a2
-        apply plus_star
-        exact H1
+      · exact a1
+      · grind
 
 theorem plus_right:
   forall a b c, star R a b -> R b c -> plus R a c := by
@@ -103,7 +100,8 @@ def infseq_if_all_seq_inf (R : α → α → Prop) : ∀ x, all_seq_inf R x → 
   constructor
   . exact Rxy
   . intro y' Ryy'
-    apply H y'
+    unfold all_seq_inf at H
+    apply H
     grind
 
 theorem infseq_coinduction_principle_2:
@@ -112,21 +110,8 @@ theorem infseq_coinduction_principle_2:
   ∀ (a : α), x a → infseq R a := by
     intro X
     intro h₁ a rel
-    apply @infseq.fixpoint_induct _ _ (fun a => ∃ b, star R a b ∧ X b)
-    case x =>
-      apply Exists.elim (h₁ a rel)
-      intro a' _
-      exists a'
-      grind
-    case y =>
-      intro a0 h₂
-      apply Exists.elim h₂
-      intro a1 ⟨ h₃ , h₄ ⟩
-      have h₁' := h₁ a1 h₄
-      apply Exists.elim h₁'
-      intro mid ⟨ h₅, h₆⟩
-      have t := plus_star_trans R a0 a1 mid h₃ h₅
-      cases t
-      any_goals grind
+    apply infseq.fixpoint_induct _ (fun a => ∃ b, star R a b ∧ X b)
+    case x => grind
+    case y => grind [cases plus]
 
 @[grind] def irred (R : α → α → Prop) (a : α) : Prop := forall b, ¬(R a b)
