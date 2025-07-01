@@ -13,9 +13,6 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
       | some v => if e.2 != v then return false
     return true
 
-set_option grind.debug true
-set_option grind.warning false
-
 @[grind] def mk_PLUS_CONST (a: aexp) (n: Int) : aexp :=
   if n = 0 then a else
   match a with
