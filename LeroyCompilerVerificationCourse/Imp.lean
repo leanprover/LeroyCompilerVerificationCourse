@@ -18,6 +18,8 @@ def store : Type := ident → Int
   | .PLUS a1 a2 => aeval s a1 + aeval s a2
   | .MINUS a1 a2 => aeval s a1 - aeval s a2
 
+/-- info: 3 -/
+#guard_msgs in
 #eval aeval (λ _ => 2) (.PLUS (.VAR "x") (.MINUS (.VAR "x") (.CONST 1)))
 
 theorem aeval_xplus1 : ∀ s x, aeval s (.PLUS (.VAR x) (.CONST 1)) > aeval s (.VAR x) := by
@@ -75,8 +77,6 @@ inductive com: Type where
   | WHILE (b: bexp) (c1: com)
 
 notation:10 l:10 " ;; " r:11 => com.SEQ l r
-
-#check .SKIP ;; .SKIP
 
 def Euclidean_division :=
   .ASSIGN "r" (.VAR "a") ;;

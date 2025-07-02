@@ -124,6 +124,8 @@ def machine_goes_wrong (C: List instr) (s_init: store) : Prop :=
 def compile_program (p: com) : List instr:=
   compile_com p ++ .Ihalt :: []
 
+/-- info: [instr.Ivar "x", instr.Iconst 1, instr.Iadd, instr.Isetvar "x", instr.Ihalt] -/
+#guard_msgs in
 #eval (compile_program (.ASSIGN "x" (.PLUS (.VAR "x") (.CONST 1))))
 
 def smart_Ibranch (d: Int) : List instr:=
