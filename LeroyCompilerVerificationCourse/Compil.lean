@@ -1,6 +1,4 @@
-import LeroyCompilerVerificationCourse.Sequences
 import LeroyCompilerVerificationCourse.Imp
-import Init.Data.List.Basic
 
 set_option grind.warning false
 
