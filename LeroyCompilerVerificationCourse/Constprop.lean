@@ -1,7 +1,5 @@
 import LeroyCompilerVerificationCourse.Imp
-import Init.Data.List.Basic
 import Std.Data.HashMap
-import Std.Data.HashMap.Lemmas
 open Classical in
 instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   beq m n := Id.run do

@@ -1,7 +1,5 @@
 import LeroyCompilerVerificationCourse.Imp
-import Init.Data.List.Basic
 import Std.Data.HashSet
-import Std.Data.HashSet.Lemmas
 set_option grind.warning false
 open Classical in
 
