@@ -4,9 +4,7 @@ Released under LGPL 2.1 license as described in the file LICENSE.md.
 Authors: Wojciech Różowski
 -/
 
-import LeroyCompilerVerificationCourse.Sequences
 import LeroyCompilerVerificationCourse.Imp
-import Init.Data.List.Basic
 
 @[grind] inductive instr : Type where
   | Iconst (n: Int)

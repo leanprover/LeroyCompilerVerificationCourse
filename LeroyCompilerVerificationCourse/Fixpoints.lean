@@ -6,14 +6,7 @@ Authors: Wojciech Różowski
 
 import LeroyCompilerVerificationCourse.Imp
 import LeroyCompilerVerificationCourse.Constprop
-import Init.WF
-import Std.Data.HashMap
-import Std.Data.HashMap.Lemmas
-import Batteries.Data.List.Basic
 import Batteries.Data.List.Perm
-import Init.Data.List.Pairwise
-import Init.Data.List.Sublist
-import Init.Data.List.Basic
 
 universe u
 
