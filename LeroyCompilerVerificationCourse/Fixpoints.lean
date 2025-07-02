@@ -39,7 +39,7 @@ variable (α : Sort u) (F : α → α) [OrderWithBot α]
 
 open OrderStruct OrderWithBot
 theorem fixpoint_exists_1 [Monotone α F] : ∃ x : α, eq x (F x) := by
-  have REC : forall x : α, le x (F x) -> exists y : α , eq y (F y) := by
+  have REC : forall x : α, le x (F x) -> ∃ y : α , eq y (F y) := by
     intro x
     induction x using @WellFounded.induction α gt gt_wf
     case h x ih =>

@@ -372,7 +372,7 @@ theorem agree_update_dead:
 theorem dce_correct_terminating:
   forall s c s', cexec s c s' ->
   forall L s1, agree (live c L) s s1 ->
-  exists s1', cexec s1 (dce c L) s1' /\ agree L s' s1' := by
+  ∃ s1', cexec s1 (dce c L) s1' /\ agree L s' s1' := by
     intro s c s' EXEC
     induction EXEC
     any_goals grind

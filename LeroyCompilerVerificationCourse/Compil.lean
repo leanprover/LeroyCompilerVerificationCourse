@@ -70,14 +70,14 @@ def config : Type := Int × stack × store
   star (transition C)
 
 def machine_terminates (C: List instr) (s_init: store) (s_final: store) : Prop :=
-  exists pc, transitions C (0, [], s_init) (pc, [], s_final)
+  ∃ pc, transitions C (0, [], s_init) (pc, [], s_final)
           ∧ instr_at C pc = .some .Ihalt
 
 def machine_diverges (C: List instr) (s_init: store) : Prop :=
   infseq (transition C) (0, [], s_init)
 
 def machine_goes_wrong (C: List instr) (s_init: store) : Prop :=
-  exists pc stk s,
+  ∃ pc stk s,
       transitions C (0, [], s_init) (pc, stk, s)
    ∧ irred (transition C) (pc, stk, s)
    ∧ (instr_at C pc ≠ .some .Ihalt ∨ stk ≠ [])
@@ -570,7 +570,7 @@ def com_size (c: com) : Nat :=
 
 theorem com_size_nonzero: forall c, (com_size c > 0) := by
   intro c
-  fun_induction com_size <;> grind
+  fun_induction com_size with grind
 
 def cont_size (k: cont) : Nat :=
   match k with
@@ -650,7 +650,7 @@ theorem simulation_step:
   forall C impconf1 impconf2 machconf1,
   step impconf1 impconf2 ->
   match_config C impconf1 machconf1 ->
-  exists machconf2,
+  ∃ machconf2,
       (plus (transition C) machconf1 machconf2
        \/ (star (transition C) machconf1 machconf2
            /\ (measure' impconf2 < measure' impconf1)))
@@ -750,7 +750,7 @@ theorem simulation_step:
           · exact (codelen codec + 1)
           · grind
         · simp [measure', com_size]
-          fun_induction com_size <;> grind
+          fun_induction com_size with grind
         · simp [isFalse]
           rw [h₄]
           simp [compile_com] at h₂ h₁
@@ -820,7 +820,7 @@ theorem simulation_step:
 theorem simulation_steps:
   forall C impconf1 impconf2, star step impconf1 impconf2 ->
   forall machconf1, match_config C impconf1 machconf1 ->
-  exists machconf2,
+  ∃ machconf2,
      star (transition C) machconf1 machconf2
   /\ match_config C impconf2 machconf2 := by
       intro C impconf1 impconf2 STAR machconf1 MATCH
@@ -886,7 +886,7 @@ theorem simulation_infseq_inv:
   forall C n impconf1 machconf1,
   infseq step impconf1 -> match_config C impconf1 machconf1 ->
   (measure' impconf1 < n) ->
-  exists impconf2 machconf2,
+  ∃ impconf2 machconf2,
       infseq step impconf2
    /\ plus (transition C) machconf1 machconf2
    /\ match_config C impconf2 machconf2 := by

@@ -42,7 +42,7 @@ theorem aeval_free :
   (∀ x, free_in_aexp x a → s1 x = s2 x) →
   aeval s1 a = aeval s2 a := by
     intro s1 _ a _
-    fun_induction aeval s1 a <;> grind
+    fun_induction aeval s1 a with grind
 
 inductive bexp : Type where
   | TRUE
