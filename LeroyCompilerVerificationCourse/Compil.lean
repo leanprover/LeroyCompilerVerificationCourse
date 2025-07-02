@@ -281,10 +281,6 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
           next c1 c3 a =>
             have h1 := instr_a instr.Iadd c3 (c1 ++ compile_aexp a1 ++ compile_aexp a2) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) (by grind)
             have h2 := @transition.trans_add ((c1 ++ compile_aexp a1 ++ compile_aexp a2) ++ (instr.Iadd :: c3)) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) stk s (aeval s a1) (aeval s a2) (by grind)
-<<<<<<< Updated upstream
-            simp [codelen_app, codelen_cons, codelen] at *
-=======
->>>>>>> Stashed changes
             grind
     next a1 a2 a1_ih a2_ih =>
       simp [aeval, compile_aexp]
@@ -445,7 +441,7 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
       apply code_at_app_left
       exact h
     . specialize c2_ih C (pc + codelen (compile_com c1)) stk
-      simp [compile_com, codelen_app, Int.add_assoc]
+      simp [compile_com, codelen_app]
       simp [Int.add_assoc] at c2_ih
       apply c2_ih
       grind
