@@ -2,8 +2,6 @@ import LeroyCompilerVerificationCourse.Sequences
 import LeroyCompilerVerificationCourse.Imp
 import Init.Data.List.Basic
 
-set_option grind.warning false
-
 @[grind] inductive instr : Type where
   | Iconst (n: Int)
   | Ivar (x: ident)

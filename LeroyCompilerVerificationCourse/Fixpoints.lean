@@ -11,8 +11,6 @@ import Init.Data.List.Basic
 
 universe u
 
-set_option grind.warning false
-
 @[grind] class OrderStruct (α : Sort u) where
   eq : α → α → Prop
   le : α → α → Prop
