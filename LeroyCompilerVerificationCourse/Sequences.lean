@@ -119,3 +119,34 @@ theorem infseq_coinduction_principle_2 :
     case y => grind [cases plus]
 
 @[grind] def irred (R : α → α → Prop) (a : α) : Prop := ∀ b, ¬(R a b)
+
+theorem star_star_inv (R_functional : ∀ a b c, R a b -> R a c -> b = c) : ∀ a b, star R a b -> forall c, star R a c → star R b c ∨ star R c b := by
+  intro _ _ sab
+  induction sab <;> grind
+
+theorem finseq_unique (R_functional : ∀ a b c, R a b -> R a c -> b = c) :
+  ∀ a b b', star R a b → irred R b → star R a b' → irred R b' → b = b' := by
+    intro a b b' sab ib sab' ib'
+    apply Or.elim (star_star_inv R_functional a b sab b' sab') <;> grind
+
+@[grind ]theorem infseq_star_inv (R_functional : ∀ a b c, R a b -> R a c -> b = c) : ∀ a b, star R a b → infseq R a → infseq R b := by
+  intro a b sab ia
+  induction sab
+  case star_refl => grind
+  case star_step x y z rxy syz ih =>
+    unfold infseq at ia
+    grind
+
+theorem infseq_finseq_excl (R_functional : ∀ a b c, R a b -> R a c -> b = c): ∀ a b, star R a b → irred R b → infseq R a → False := by
+  intro a b sab irb ia
+  have h : infseq R b := by grind
+  unfold infseq at h
+  grind
+
+theorem infseq_all_seq_inf (R_functional : ∀ a b c, R a b -> R a c -> b = c): ∀ a, infseq R a → all_seq_inf R a := by
+  intro a ia
+  unfold all_seq_inf
+  intro b sab
+  have h : infseq R b := by grind
+  unfold infseq at h
+  grind
