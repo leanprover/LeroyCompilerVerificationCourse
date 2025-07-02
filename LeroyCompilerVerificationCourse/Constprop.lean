@@ -52,12 +52,12 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
 #eval simplif_aexp (.MINUS (.PLUS (.VAR "x") (.CONST 1)) (.PLUS (.VAR "y") (.CONST 1)))
 
 @[grind] theorem mk_PLUS_CONST_sound:
-  forall s a n, aeval s (mk_PLUS_CONST a n) = aeval s a + n := by
+  ∀ s a n, aeval s (mk_PLUS_CONST a n) = aeval s a + n := by
     intro s a n
     fun_cases mk_PLUS_CONST a n <;> grind
 
 theorem mk_PLUS_sound:
-  forall s a1 a2, aeval s (mk_PLUS a1 a2) = aeval s a1 + aeval s a2 := by
+  ∀ s a1 a2, aeval s (mk_PLUS a1 a2) = aeval s a1 + aeval s a2 := by
     intro s a1 a2
     fun_cases mk_PLUS a1 a2
     <;> (try (simp [aeval]) ; try (simp [mk_PLUS_CONST_sound ]) ; grind)
@@ -65,11 +65,11 @@ theorem mk_PLUS_sound:
       grind
 
 theorem mk_MINUS_sound:
-  forall s a1 a2, aeval s (mk_MINUS a1 a2) = aeval s a1 - aeval s a2 := by
+  ∀ s a1 a2, aeval s (mk_MINUS a1 a2) = aeval s a1 - aeval s a2 := by
     intro s a1 a2
     fun_cases mk_MINUS a1 a2 <;> (try (simp [aeval]) ; try (simp [mk_PLUS_CONST_sound ]) ; grind)
 
-theorem simplif_aexp_sound : forall s a, aeval s (simplif_aexp a) = aeval s a := by
+theorem simplif_aexp_sound : ∀ s a, aeval s (simplif_aexp a) = aeval s a := by
   intro s a
   induction a
   any_goals grind [mk_PLUS_sound, mk_MINUS_sound]
@@ -102,22 +102,22 @@ theorem simplif_aexp_sound : forall s a, aeval s (simplif_aexp a) = aeval s a :=
   | _, _ => .AND b1 b2
 
 theorem mk_EQUAL_sound:
-  forall s a1 a2, beval s (mk_EQUAL a1 a2) = (aeval s a1 = aeval s a2) := by
+  ∀ s a1 a2, beval s (mk_EQUAL a1 a2) = (aeval s a1 = aeval s a2) := by
     intro s a1 a2
     fun_cases (mk_EQUAL a1 a2) <;> grind
 
 theorem mk_LESSEQUAL_sound:
-  forall s a1 a2, beval s (mk_LESSEQUAL a1 a2) = (aeval s a1 <= aeval s a2) := by
+  ∀ s a1 a2, beval s (mk_LESSEQUAL a1 a2) = (aeval s a1 <= aeval s a2) := by
     intro s a1 a2
     fun_cases mk_LESSEQUAL a1 a2 <;> grind
 
 theorem mk_NOT_sound :
-  forall s b, beval s (mk_NOT b) = ¬ (beval s b) := by
+  ∀ s b, beval s (mk_NOT b) = ¬ (beval s b) := by
     intros s b
     fun_cases (mk_NOT b) <;> grind
 
 theorem mk_AND_sound:
-  forall s b1 b2, beval s (mk_AND b1 b2) = (beval s b1 ∧ beval s b2) := by
+  ∀ s b1 b2, beval s (mk_AND b1 b2) = (beval s b1 ∧ beval s b2) := by
     intro s b1 b2
     fun_cases mk_AND b1 b2
     any_goals grind
@@ -133,19 +133,19 @@ theorem mk_AND_sound:
   | .FALSE => .SKIP
   | _ => .WHILE b c
 
-theorem cexec_mk_IFTHENELSE: forall s1 b c1 c2 s2,
+theorem cexec_mk_IFTHENELSE: ∀ s1 b c1 c2 s2,
   cexec s1 (if beval s1 b then c1 else c2) s2 ->
   cexec s1 (mk_IFTHENELSE b c1 c2) s2 := by
     intro s1 b c1 c2 s2
     fun_cases (mk_IFTHENELSE b c1 c2) <;> grind
 
-theorem cexec_mk_WHILE_done: forall s1 b c,
+theorem cexec_mk_WHILE_done: ∀ s1 b c,
   beval s1 b = false ->
   cexec s1 (mk_WHILE b c) s1 := by
     intro s1 b c H
     fun_cases mk_WHILE b c <;> grind
 
-theorem cexec_mk_WHILE_loop: forall b c s1 s2 s3,
+theorem cexec_mk_WHILE_loop: ∀ b c s1 s2 s3,
   beval s1 b = true -> cexec s1 c s2 -> cexec s2 (mk_WHILE b c) s3 ->
   cexec s1 (mk_WHILE b c) s3 := by
     intro b c s1 s2 s3 h1 h2 h3
@@ -153,10 +153,10 @@ theorem cexec_mk_WHILE_loop: forall b c s1 s2 s3,
 
 def Store := Std.HashMap ident Int
 @[grind] def matches' (s: store) (S: Store): Prop :=
-  forall x n, S.get? x = .some n -> s x = n
+  ∀ x n, S.get? x = .some n -> s x = n
 
 @[grind] def Le (S1 S2: Store) : Prop :=
-  forall x n, S2.get? x = .some n -> S1.get? x = .some n
+  ∀ x n, S2.get? x = .some n -> S1.get? x = .some n
 
 @[grind] def Top : Store := Std.HashMap.emptyWithCapacity
 
@@ -169,17 +169,17 @@ def Equal (S1 S2: Store) := Std.HashMap.Equiv S1 S2
 noncomputable instance : Decidable (Equal S' S) :=
   Classical.propDecidable (Equal S' S)
 
-theorem matches_Le: forall s S1 S2, Le S1 S2 -> matches' s S1 -> matches' s S2 := by
+theorem matches_Le: ∀ s S1 S2, Le S1 S2 -> matches' s S1 -> matches' s S2 := by
   intro s S1 S2 h1 h2
   grind
 
-theorem Le_Top: forall S, Le S Top := by
+theorem Le_Top: ∀ S, Le S Top := by
   unfold Le Top
   intros
   grind [Std.HashMap]
 
 @[grind] theorem Join_characterization:
-forall S1 S2 x n,
+∀ S1 S2 x n,
   (Join S1 S2).get? x = .some n ↔
   S1.get? x = .some n ∧ S2.get? x = .some n := by
   intro S1 S2 x n
@@ -190,11 +190,11 @@ forall S1 S2 x n,
     simp [Join]
     grind
 
-theorem Le_Join_l: forall S1 S2, Le S1 (Join S1 S2) := by intros; grind
+theorem Le_Join_l: ∀ S1 S2, Le S1 (Join S1 S2) := by intros; grind
 
-theorem  Le_Join_r: forall S1 S2, Le S2 (Join S1 S2) := by intros; grind
+theorem  Le_Join_r: ∀ S1 S2, Le S2 (Join S1 S2) := by intros; grind
 
-theorem Equal_Le: forall S1 S2, Equal S1 S2 -> Le S1 S2 := by
+theorem Equal_Le: ∀ S1 S2, Equal S1 S2 -> Le S1 S2 := by
   intro S1 S2 eq
   unfold Equal at eq
   unfold Le
@@ -228,8 +228,8 @@ theorem Equal_Le: forall S1 S2, Equal S1 S2 -> Le S1 S2 := by
   | .AND b1 b2 => lift2 (fun m n => m && n) (Beval S b1) (Beval S b2)
 
 @[grind] theorem Aeval_sound:
-  forall s S, matches' s S ->
-  forall a n, Aeval S a = .some n -> aeval s a = n := by
+  ∀ s S, matches' s S ->
+  ∀ a n, Aeval S a = .some n -> aeval s a = n := by
     intro s S h1 a n h2
     induction a generalizing n
     any_goals grind
@@ -243,8 +243,8 @@ theorem Equal_Le: forall S1 S2, Equal S1 S2 -> Le S1 S2 := by
       split at h2 <;> grind
 
 theorem Beval_sound:
-  forall s S, matches' s S ->
-  forall b n, Beval S b = .some n -> beval s b = n := by
+  ∀ s S, matches' s S ->
+  ∀ b n, Beval S b = .some n -> beval s b = n := by
     intro s S h1 b n h2
     induction b generalizing n
     any_goals grind
@@ -272,7 +272,7 @@ theorem Beval_sound:
   | .none => S.erase x
   | .some n => S.insert x n
 
-@[grind] theorem update_characterisation : forall S x N y,
+@[grind] theorem update_characterisation : ∀ S x N y,
   (Update x N S).get? y = if x == y then N else S.get? y := by
     intro S x N y
     simp
@@ -287,9 +287,9 @@ theorem Beval_sound:
       unfold Update
       grind
 
-theorem matches_update: forall s S x n N,
+theorem matches_update: ∀ s S x n N,
   matches' s S ->
-  (forall i, N = .some i -> n = i) ->
+  (∀ i, N = .some i -> n = i) ->
   matches' (update x n s) (Update x N S) := by
     intro s S x n N m h
     grind
@@ -308,7 +308,7 @@ theorem matches_update: forall s S x n N,
 
 theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint F init_S) :
   Le (F S) S := by
-    have A : forall fuel S,
+    have A : ∀ fuel S,
              fixpoint_rec F fuel S = Top
              \/ Equal (F (fixpoint_rec F fuel S)) (fixpoint_rec F fuel S) := by
       intro fuel
@@ -334,7 +334,7 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
       fixpoint (fun x => Join S (Cexec x c1)) S
 
 @[grind] theorem Cexec_sound:
-  forall c s1 s2 S1,
+  ∀ c s1 s2 S1,
   cexec s1 c s2 -> matches' s1 S1 -> matches' s2 (Cexec S1 c) := by
     intro c
     induction c
@@ -368,7 +368,7 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
       intro s1 s2 S1 EXEC MATCHES
       generalize eq1 : (fun x => Join S1 (Cexec x c)) = F
       generalize eq2 : fixpoint F S1 = X
-      have INNER : forall s1 c1 s2,
+      have INNER : ∀ s1 c1 s2,
                  cexec s1 c1 s2 ->
                  c1 = .WHILE b c ->
                  matches' s1 X ->
@@ -378,12 +378,12 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
                   any_goals grind
                   case cexec_while_loop s' b' c' s5 s6 EXEC2 EXEC3 EXEC4 _ a_ih2 =>
                     apply a_ih2
-                    . grind
-                    . apply matches_Le
+                    · grind
+                    · apply matches_Le
                       rotate_right
-                      . exact F X
-                      . exact @fixpoint_sound X F S1 (by grind)
-                      . rw [←eq2, ←eq1]
+                      · exact F X
+                      · exact @fixpoint_sound X F S1 (by grind)
+                      · rw [←eq2, ←eq1]
                         simp
                         apply matches_Le
                         apply Le_Join_r
@@ -397,20 +397,20 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
       unfold Cexec
       rw [eq1, eq2]
       apply INNER
-      . apply EXEC
-      . rfl
-      . apply matches_Le
+      · apply EXEC
+      · rfl
+      · apply matches_Le
         have := @fixpoint_sound X F
         apply this
         rotate_left
-        . exact S1
+        · exact S1
         rotate_left
-        . grind
-        . rw [←eq1]
+        · grind
+        · rw [←eq1]
           simp
           apply matches_Le
-          . apply Le_Join_l
-          . exact MATCHES
+          · apply Le_Join_l
+          · exact MATCHES
 
 @[grind] def cp_aexp (S: Store) (a: aexp) : aexp :=
   match a with
@@ -432,14 +432,14 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
   | .AND b1 b2 => mk_AND (cp_bexp S b1) (cp_bexp S b2)
 
 @[grind] theorem cp_aexp_sound:
-  forall s S, matches' s S ->
-  forall a, aeval s (cp_aexp S a) = aeval s a := by
+  ∀ s S, matches' s S ->
+  ∀ a, aeval s (cp_aexp S a) = aeval s a := by
     intro s S AG a
     induction a <;> grind [mk_PLUS_sound, mk_MINUS_sound]
 
 theorem cp_bexp_sound:
-  forall s S, matches' s S ->
-  forall b, beval s (cp_bexp S b) = beval s b := by
+  ∀ s S, matches' s S ->
+  ∀ b, beval s (cp_bexp S b) = beval s b := by
     intro s S AG b
     induction b
     any_goals grind [mk_EQUAL_sound, mk_LESSEQUAL_sound, mk_AND_sound, mk_NOT_sound]
@@ -458,7 +458,7 @@ theorem cp_bexp_sound:
       mk_WHILE (cp_bexp sfix b) (cp_com sfix c)
 
 theorem cp_com_correct_terminating:
-  forall c s1 s2 S1,
+  ∀ c s1 s2 S1,
   cexec s1 c s2 -> matches' s1 S1 -> cexec s1 (cp_com S1 c) s2 := by
     intro c s1 s2 S1 EXEC AG
     induction c generalizing s1 s2 S1
@@ -477,7 +477,7 @@ theorem cp_com_correct_terminating:
     case WHILE b c c_ih =>
       generalize heq1 : com.WHILE b c = loop
       generalize heq2 : Cexec S1 (.WHILE b c) = X
-      have INNER: forall s1 c1 s2,
+      have INNER: ∀ s1 c1 s2,
                  cexec s1 c1 s2 ->
                  c1 = .WHILE b c ->
                  matches' s1 X ->
@@ -494,36 +494,36 @@ theorem cp_com_correct_terminating:
                     any_goals grind
                     case cexec_while_done isFalse =>
                       apply cexec_mk_WHILE_done
-                      . grind [cp_bexp_sound]
+                      · grind [cp_bexp_sound]
                     case cexec_while_loop s3 b' c' s4 s5 isTrue EXEC2 EXEC3 a_ih a_ih2 =>
                       apply cexec_mk_WHILE_loop
-                      . grind [cp_bexp_sound]
-                      . apply c_ih
-                        . injections heq4 heq5
+                      · grind [cp_bexp_sound]
+                      · apply c_ih
+                        · injections heq4 heq5
                           rw [heq2'] at heq5
                           rw [←heq5] at EXEC2
                           exact EXEC2
-                        . exact AG1
-                      . apply a_ih2
+                        · exact AG1
+                      · apply a_ih2
                         rotate_left
-                        . grind
-                        . apply matches_Le
+                        · grind
+                        · apply matches_Le
                           rw [←heq2]
                           simp [Cexec]
                           apply fixpoint_sound
                           rotate_left
-                          . exact (fun x => Join S1 (Cexec x c))
-                          . exact S1
+                          · exact (fun x => Join S1 (Cexec x c))
+                          · exact S1
                           rotate_left
-                          . grind
-                          . apply matches_Le
-                            . apply Le_Join_r
-                            . apply Cexec_sound
-                              . rw [←heq2']
+                          · grind
+                          · apply matches_Le
+                            · apply Le_Join_r
+                            · apply Cexec_sound
+                              · rw [←heq2']
                                 injections heq3 heq4
                                 rw [heq4]
                                 exact EXEC2
-                              . grind
+                              · grind
       rw [heq1] at EXEC
       induction EXEC
       any_goals grind
@@ -534,12 +534,12 @@ theorem cp_com_correct_terminating:
         rw [←heq3, ←heq4, heq2]
         apply INNER
         any_goals grind
-        . rw [←heq2]
+        · rw [←heq2]
           simp [Cexec]
           apply matches_Le
-          . apply fixpoint_sound
+          · apply fixpoint_sound
             rotate_left
-            . exact (fun x => Join S1 (Cexec x c))
-            . exact S1
-            . grind
-          . grind
+            · exact (fun x => Join S1 (Cexec x c))
+            · exact S1
+            · grind
+          · grind
