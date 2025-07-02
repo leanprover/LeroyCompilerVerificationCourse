@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under LGPL 2.1 license as described in the file LICENSE.md.
+Authors: Wojciech Różowski
+-/
+
 import LeroyCompilerVerificationCourse.Sequences
 import LeroyCompilerVerificationCourse.Imp
 import Init.Data.List.Basic
@@ -122,6 +128,8 @@ def machine_goes_wrong (C: List instr) (s_init: store) : Prop :=
 def compile_program (p: com) : List instr:=
   compile_com p ++ .Ihalt :: []
 
+/-- info: [instr.Ivar "x", instr.Iconst 1, instr.Iadd, instr.Isetvar "x", instr.Ihalt] -/
+#guard_msgs in
 #eval (compile_program (.ASSIGN "x" (.PLUS (.VAR "x") (.CONST 1))))
 
 def smart_Ibranch (d: Int) : List instr:=

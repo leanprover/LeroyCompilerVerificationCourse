@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under LGPL 2.1 license as described in the file LICENSE.md.
+Authors: Wojciech Różowski
+-/
+
 import LeroyCompilerVerificationCourse.Sequences
 import LeroyCompilerVerificationCourse.Imp
 import Init.Data.List.Basic
@@ -44,6 +50,8 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   | .PLUS a1 a2 => mk_PLUS (simplif_aexp a1) (simplif_aexp a2)
   | .MINUS a1 a2 => mk_MINUS (simplif_aexp a1) (simplif_aexp a2)
 
+/-- info: aexp.MINUS (aexp.VAR "x") (aexp.VAR "y") -/
+#guard_msgs in
 #eval simplif_aexp (.MINUS (.PLUS (.VAR "x") (.CONST 1)) (.PLUS (.VAR "y") (.CONST 1)))
 
 @[grind] theorem mk_PLUS_CONST_sound:
