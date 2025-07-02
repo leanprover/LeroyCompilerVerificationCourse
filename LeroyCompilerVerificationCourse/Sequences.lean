@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under LGPL 2.1 license as described in the file LICENSE.md.
+Authors: Wojciech Różowski
+-/
+
 set_option grind.warning false
 
 def infseq {α} (R : α → α → Prop) : α → Prop :=
