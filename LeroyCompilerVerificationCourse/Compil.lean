@@ -34,33 +34,33 @@ def config : Type := Int × stack × store
       instr_at C pc = .some (.Iconst n) →
       transition C (pc    , stk     , s)
                    (pc + 1, n :: stk, s)
-  | trans_var : forall pc stk s x,
+  | trans_var : ∀ pc stk s x,
       instr_at C pc = .some (.Ivar x) ->
       transition C (pc    , stk       , s)
                    (pc + 1, s x :: stk, s)
-  | trans_setvar: forall pc stk s x n,
+  | trans_setvar: ∀ pc stk s x n,
       instr_at C pc = .some (.Isetvar x) ->
       transition C (pc    , n :: stk, s)
                    (pc + 1, stk     , update x n s)
-  | trans_add: forall pc stk s n1 n2,
+  | trans_add: ∀ pc stk s n1 n2,
       instr_at C pc = .some (.Iadd) ->
       transition C (pc    , n2 :: n1 :: stk , s)
                    (pc + 1, (n1 + n2) :: stk, s)
-  | trans_opp: forall pc stk s n,
+  | trans_opp: ∀ pc stk s n,
       instr_at C pc = .some (.Iopp) ->
       transition C (pc    , n :: stk    , s)
                    (pc + 1, (- n) :: stk, s)
-  | trans_branch: forall pc stk s d pc',
+  | trans_branch: ∀ pc stk s d pc',
       instr_at C pc = .some (.Ibranch d) ->
       pc' = pc + 1 + d ->
       transition C (pc , stk, s)
                    (pc', stk, s)
-  | trans_beq: forall pc stk s d1 d0 n1 n2 pc',
+  | trans_beq: ∀ pc stk s d1 d0 n1 n2 pc',
       instr_at C pc = .some (.Ibeq d1 d0) ->
       pc' = pc + 1 + (if n1 = n2 then d1 else d0) ->
       transition C (pc , n2 :: n1 :: stk, s)
                    (pc', stk            , s)
-  | trans_ble: forall pc stk s d1 d0 n1 n2 pc',
+  | trans_ble: ∀ pc stk s d1 d0 n1 n2 pc',
       instr_at C pc = .some (.Ible d1 d0) ->
       pc' = pc + 1 + (if n1 ≤ n2 then d1 else d0) ->
       transition C (pc , n2 :: n1 :: stk, s)
@@ -134,22 +134,22 @@ def smart_Ibranch (d: Int) : List instr:=
   if d = 0 then [] else .Ibranch d :: []
 
 @[grind] inductive code_at: List instr -> Int -> List instr-> Prop where
-  | code_at_intro: forall C1 C2 C3 pc,
+  | code_at_intro: ∀ C1 C2 C3 pc,
       pc = codelen C1 ->
       code_at (C1 ++ C2 ++ C3) pc C2
 
 @[grind] theorem codelen_cons:
-  forall i c, codelen (i :: c) = codelen c + 1 := by grind
+  ∀ i c, codelen (i :: c) = codelen c + 1 := by grind
 
 @[grind] theorem codelen_singleton : codelen [i] = 1 := by
   dsimp [codelen]
 
 @[grind] theorem codelen_app:
-  forall c1 c2, codelen (c1 ++ c2) = codelen c1 + codelen c2 := by
+  ∀ c1 c2, codelen (c1 ++ c2) = codelen c1 + codelen c2 := by
     intro c1 _
     induction c1 with grind
 
-@[grind =>] theorem instr_a : forall i c2 c1 pc,
+@[grind =>] theorem instr_a : ∀ i c2 c1 pc,
   pc = codelen c1 ->
   instr_at (c1 ++ (i :: c2) ) pc = .some i := by
     intro i c2 c1 pc
@@ -163,7 +163,7 @@ def smart_Ibranch (d: Int) : List instr:=
     induction c1 generalizing pc with grind
 
 theorem code_at_head :
-  forall C pc i C',
+  ∀ C pc i C',
   code_at C pc (i :: C') ->
   instr_at C pc = .some i := by
     intro C pc i C'  H
@@ -175,7 +175,7 @@ theorem code_at_head :
       induction c1 generalizing oc with grind
 
 @[grind] theorem code_at_tail :
-   forall C pc i C',
+   ∀ C pc i C',
   code_at C pc (i :: C') →
   code_at C (pc + 1) C' := by
     intro C pc i C' h
@@ -185,7 +185,7 @@ theorem code_at_head :
       grind
 
 @[grind] theorem code_at_app_left:
-  forall C pc C1 C2,
+  ∀ C pc C1 C2,
   code_at C pc (C1 ++ C2) ->
   code_at C pc C1 := by
     intro c pc m1 m2 h
@@ -195,7 +195,7 @@ theorem code_at_head :
       grind [List.append_assoc]
 
 @[grind] theorem code_at_app_right:
-  forall C pc C1 C2,
+  ∀ C pc C1 C2,
   code_at C pc (C1 ++ C2) ->
   code_at C (pc + codelen C1) C2 := by
     intro C pc c1 c2 h
@@ -204,7 +204,7 @@ theorem code_at_head :
       have := code_at.code_at_intro (b ++ c1) c2 e (pc + codelen c1) (by grind)
       grind [List.append_assoc]
 
-@[grind] theorem code_at_app_right2 : forall C pc C1 C2 C3,
+@[grind] theorem code_at_app_right2 : ∀ C pc C1 C2 C3,
   code_at C pc (C1 ++ C2 ++ C3) →
   code_at C (pc + codelen C1) C2 := by
     intro C pc c1 c2 c3 h
@@ -213,7 +213,7 @@ theorem code_at_head :
       have := code_at.code_at_intro (b ++ c1) c2 (c3 ++ e) (pc + codelen c1) (by grind)
       grind
 
-@[grind] theorem code_at_nil : forall C pc C1,
+@[grind] theorem code_at_nil : ∀ C pc C1,
   code_at C pc C1 -> code_at C pc [] := by
     intro C pc c1 h
     cases h
@@ -222,7 +222,7 @@ theorem code_at_head :
       grind [List.append_nil, List.append_assoc]
 
 @[grind] theorem instr_at_code_at_nil :
-  forall C pc i, instr_at C pc = .some i -> code_at C pc [] := by
+  ∀ C pc i, instr_at C pc = .some i -> code_at C pc [] := by
     intro C pc i h
     induction C generalizing pc i
     case nil => grind
@@ -532,29 +532,29 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
           grind
 
 inductive compile_cont (C: List instr) : cont -> Int -> Prop where
-  | ccont_stop: forall pc,
+  | ccont_stop: ∀ pc,
       instr_at C pc = .some .Ihalt ->
       compile_cont C .Kstop pc
-  | ccont_seq: forall c k pc pc',
+  | ccont_seq: ∀ c k pc pc',
       code_at C pc (compile_com c) ->
       pc' = pc + codelen (compile_com c) ->
       compile_cont C k pc' ->
       compile_cont C (.Kseq c k) pc
-  | ccont_while: forall b c k pc d pc' pc'',
+  | ccont_while: ∀ b c k pc d pc' pc'',
       instr_at C pc = .some (.Ibranch d) ->
       pc' = pc + 1 + d ->
       code_at C pc' (compile_com (.WHILE b c)) ->
       pc'' = pc' + codelen (compile_com (.WHILE b c)) ->
       compile_cont C k pc'' ->
       compile_cont C (.Kwhile b c k) pc
-  | ccont_branch: forall d k pc pc',
+  | ccont_branch: ∀ d k pc pc',
       instr_at C pc = .some (.Ibranch d) ->
       pc' = pc + 1 + d ->
       compile_cont C k pc' ->
       compile_cont C k pc
 
 inductive match_config (C: List instr): com × cont × store -> config -> Prop where
-  | match_config_intro: forall c k st pc,
+  | match_config_intro: ∀ c k st pc,
       code_at C pc (compile_com c) ->
       compile_cont C k (pc + codelen (compile_com c)) ->
       match_config C (c, k, st) (pc, [], st)
@@ -568,7 +568,7 @@ def com_size (c: com) : Nat :=
   | .WHILE _ c1 => (com_size c1 + 1)
 
 
-theorem com_size_nonzero: forall c, (com_size c > 0) := by
+theorem com_size_nonzero: ∀ c, (com_size c > 0) := by
   intro c
   fun_induction com_size with grind
 
@@ -647,7 +647,7 @@ theorem match_config_skip (C : List instr) (k : cont) (s : store) (pc : Int) (H:
   · grind
 
 theorem simulation_step:
-  forall C impconf1 impconf2 machconf1,
+  ∀ C impconf1 impconf2 machconf1,
   step impconf1 impconf2 ->
   match_config C impconf1 machconf1 ->
   ∃ machconf2,
@@ -818,8 +818,8 @@ theorem simulation_step:
           · exact w₂.2
 
 theorem simulation_steps:
-  forall C impconf1 impconf2, star step impconf1 impconf2 ->
-  forall machconf1, match_config C impconf1 machconf1 ->
+  ∀ C impconf1 impconf2, star step impconf1 impconf2 ->
+  ∀ machconf1, match_config C impconf1 machconf1 ->
   ∃ machconf2,
      star (transition C) machconf1 machconf2
   /\ match_config C impconf2 machconf2 := by
@@ -852,7 +852,7 @@ theorem instr_at_len : instr_at (C ++ [i]) (codelen C) = .some i := by
   induction C with grind
 
 theorem match_initial_configs:
-  forall c s,
+  ∀ c s,
   match_config (compile_program c) (c, .Kstop, s) (0, [], s) := by
     intro c s
     generalize heq : compile_com c = C
@@ -865,7 +865,7 @@ theorem match_initial_configs:
       grind
 
 theorem compile_program_correct_terminating_2:
-  forall c s s',
+  ∀ c s s',
   star step (c, .Kstop, s) (.SKIP, .Kstop, s') ->
   machine_terminates (compile_program c) s s' := by
     intro c s s' STAR
@@ -883,7 +883,7 @@ theorem compile_program_correct_terminating_2:
       · exact E
 
 theorem simulation_infseq_inv:
-  forall C n impconf1 machconf1,
+  ∀ C n impconf1 machconf1,
   infseq step impconf1 -> match_config C impconf1 machconf1 ->
   (measure' impconf1 < n) ->
   ∃ impconf2 machconf2,
@@ -916,7 +916,7 @@ theorem simulation_infseq_inv:
           · exact w.2.2
 
 theorem compile_program_correct_diverging:
-  forall c s,
+  ∀ c s,
   infseq step (c, .Kstop, s) ->
   machine_diverges (compile_program c) s := by
     intro c s H

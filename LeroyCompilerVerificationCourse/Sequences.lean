@@ -76,7 +76,7 @@ theorem plus_one : ∀ a b, R a b → plus R a b := by
     grind
 
 theorem star_plus_trans:
-  forall a b c, star R a b -> plus R b c -> plus R a c := by
+  ∀ a b c, star R a b -> plus R b c -> plus R a c := by
     intro a b c H0 H1
     cases H0
     case star_refl =>
@@ -87,7 +87,7 @@ theorem star_plus_trans:
       · grind
 
 theorem plus_right:
-  forall a b c, star R a b -> R b c -> plus R a c := by
+  ∀ a b c, star R a b -> R b c -> plus R a c := by
   intro a b c h₁ h₂
   grind [star_plus_trans, plus_one]
 
@@ -118,4 +118,4 @@ theorem infseq_coinduction_principle_2:
     case x => grind
     case y => grind [cases plus]
 
-@[grind] def irred (R : α → α → Prop) (a : α) : Prop := forall b, ¬(R a b)
+@[grind] def irred (R : α → α → Prop) (a : α) : Prop := ∀ b, ¬(R a b)

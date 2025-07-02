@@ -429,25 +429,25 @@ theorem reds_to_cexec (s s' : store) (c : com) :
 
 inductive step: com × cont × store -> com × cont × store -> Prop where
 
-  | step_assign: forall x a k s,
+  | step_assign: ∀ x a k s,
       step (.ASSIGN x a, k, s) (.SKIP, k, update x (aeval s a) s)
 
-  | step_seq: forall c1 c2 s k,
+  | step_seq: ∀ c1 c2 s k,
       step (.SEQ c1 c2, k, s) (c1, .Kseq c2 k, s)
 
-  | step_ifthenelse: forall b c1 c2 k s,
+  | step_ifthenelse: ∀ b c1 c2 k s,
       step (.IFTHENELSE b c1 c2, k, s) ((if beval s b then c1 else c2), k, s)
 
-  | step_while_done: forall b c k s,
+  | step_while_done: ∀ b c k s,
       beval s b = false ->
       step (.WHILE b c, k, s) (.SKIP, k, s)
 
-  | step_while_true: forall b c k s,
+  | step_while_true: ∀ b c k s,
       beval s b = true ->
       step (.WHILE b c, k, s) (c, .Kwhile b c k, s)
 
-  | step_skip_seq: forall c k s,
+  | step_skip_seq: ∀ c k s,
       step (.SKIP, .Kseq c k, s) (c, k, s)
 
-  | step_skip_while: forall b c k s,
+  | step_skip_while: ∀ b c k s,
       step (.SKIP, .Kwhile b c k, s) (.WHILE b c, k, s)

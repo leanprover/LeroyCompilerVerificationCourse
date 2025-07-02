@@ -39,7 +39,7 @@ variable (α : Sort u) (F : α → α) [OrderWithBot α]
 
 open OrderStruct OrderWithBot
 theorem fixpoint_exists_1 [Monotone α F] : ∃ x : α, eq x (F x) := by
-  have REC : forall x : α, le x (F x) -> ∃ y : α , eq y (F y) := by
+  have REC : ∀ x : α, le x (F x) -> ∃ y : α , eq y (F y) := by
     intro x
     induction x using @WellFounded.induction α gt gt_wf
     case h x ih =>
@@ -71,13 +71,13 @@ instance : WellFoundedRelation α  where
   rel := gt
   wf := gt_wf
 
-@[grind] def iterate (x : α) (PRE: le x (F x)) (SMALL: forall z, le (F z) z -> le x z) : α :=
+@[grind] def iterate (x : α) (PRE: le x (F x)) (SMALL: ∀ z, le (F z) z -> le x z) : α :=
   if beq x (F x) then x else iterate (F x) (by apply F_mon; exact PRE) (by intro z hyp; specialize SMALL z hyp; apply le_trans; apply F_mon; exact SMALL; exact hyp)
   termination_by x
   decreasing_by
     grind [beq_false']
 
-@[grind] theorem iterate_correct (x : α) (PRE: le x (F x)) (SMALL: forall z, le (F z) z -> le x z) (heq : y = iterate _ F x PRE SMALL ) : eq y (F y) ∧ ∀ z, le (F z) z → le y z := by
+@[grind] theorem iterate_correct (x : α) (PRE: le x (F x)) (SMALL: ∀ z, le (F z) z -> le x z) (heq : y = iterate _ F x PRE SMALL ) : eq y (F y) ∧ ∀ z, le (F z) z → le y z := by
   fun_induction iterate
   case case1 x' PRE SMALL isTrue  =>
     constructor
@@ -168,7 +168,7 @@ theorem hash_set_incl_size_leq (S1 S2 : Store) : Le S2 S1 → List.Subperm (S1.t
       grind
 
 @[grind] theorem Gt_cardinal:
-  forall S S', Gt S S' -> S.size < S'.size := by
+  ∀ S S', Gt S S' -> S.size < S'.size := by
     intro S S' hyp
     unfold Gt at hyp
     have ⟨ t₁, t₂ ⟩ := @Le_cardinal S S' (hyp.1)
@@ -270,7 +270,7 @@ theorem fixpoint_join_sound : Le Init (fixpoint_join Init F) /\ Le (F (fixpoint_
     · apply Le_Join_r
 
 theorem fixpoint_join_smallest:
-  forall S, Le (Join Init (F S)) S -> Le (fixpoint_join Init F) S := by
+  ∀ S, Le (Join Init (F S)) S -> Le (fixpoint_join Init F) S := by
     intro S LE
     unfold fixpoint_join
     dsimp
@@ -289,18 +289,18 @@ theorem fixpoint_join_smallest:
       dsimp
 
 @[grind] theorem Join_increasing:
-  forall S1 S2 S3 S4,
+  ∀ S1 S2 S3 S4,
   Le S1 S2 -> Le S3 S4 -> Le (Join S1 S3) (Join S2 S4) := by
     intros
     grind
 
 @[grind] theorem Aeval_increasing: ∀ S1 S2, Le S1 S2 ->
-  forall a n, Aeval S2 a = .some n -> Aeval S1 a =.some n := by
+  ∀ a n, Aeval S2 a = .some n -> Aeval S1 a =.some n := by
     intro S1 S2 LE a
     induction a <;> grind
 
 @[grind] theorem Beval_increasing : ∀ S1 S2, Le S1 S2 ->
-  forall b n, Beval S2 b = .some n -> Beval S1 b = .some n := by
+  ∀ b n, Beval S2 b = .some n -> Beval S1 b = .some n := by
     intro S1 S2 LE b
     induction b
     any_goals grind
@@ -310,7 +310,7 @@ theorem fixpoint_join_smallest:
       grind
 
 theorem Update_increasing:
-  forall S1 S2 x a,
+  ∀ S1 S2 x a,
   Le S1 S2 ->
   Le (Update x (Aeval S1 a) S1) (Update x (Aeval S2 a) S2) := by
     intros; grind

@@ -114,7 +114,7 @@ theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F
       deadcode_fixpoint (fun x => L' ∪ (live c x)) default
 
 theorem live_upper_bound:
-  forall c L,
+  ∀ c L,
    (live c L) ⊆ ((fv_com c) ∪  L) := by
     intro c
     induction c
@@ -225,10 +225,10 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
   | .WHILE b c => .WHILE b (dce c (live (.WHILE b c) L))
 
 @[grind] def agree (L: IdentSet) (s1 s2: store) : Prop :=
-  forall x, x  ∈ L -> s1 x = s2 x
+  ∀ x, x  ∈ L -> s1 x = s2 x
 
 @[grind] theorem agree_mon:
-  forall L L' s1 s2,
+  ∀ L L' s1 s2,
   agree L' s1 s2 -> L ⊆ L' -> agree L s1 s2 := by
     intro L L' s1 s2 AG sub
     unfold agree at *
@@ -238,8 +238,8 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
     exact AG
 
 @[grind] theorem aeval_agree:
-  forall L s1 s2, agree L s1 s2 ->
-  forall a, (fv_aexp a) ⊆ L -> aeval s1 a = aeval s2 a := by
+  ∀ L s1 s2, agree L s1 s2 ->
+  ∀ a, (fv_aexp a) ⊆ L -> aeval s1 a = aeval s2 a := by
     intro L s1 s2 AG a
     induction a
     any_goals grind
@@ -289,7 +289,7 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
 
 theorem beval_agree:
   ∀ L s1 s2, agree L s1 s2 ->
-  forall b, (fv_bexp b) ⊆ L -> beval s1 b = beval s2 b := by
+  ∀ b, (fv_bexp b) ⊆ L -> beval s1 b = beval s2 b := by
     intro L s1 s2 AG b
     induction b
     any_goals grind
@@ -343,7 +343,7 @@ theorem beval_agree:
       grind
 
 theorem agree_update_live:
-  forall s1 s2 L x v,
+  ∀ s1 s2 L x v,
   agree (L.erase x) s1 s2 ->
   agree L (update x v s1) (update x v s2) := by
     intro s1 s2 L x v AG
@@ -359,7 +359,7 @@ theorem agree_update_live:
       grind
 
 theorem agree_update_dead:
-  forall s1 s2 L x v,
+  ∀ s1 s2 L x v,
   agree L s1 s2 -> ¬x ∈ L ->
   agree L (update x v s1) s2 := by
     intro s1 s2 L x v AG not
@@ -370,8 +370,8 @@ theorem agree_update_dead:
     by_cases x=y <;> grind
 
 theorem dce_correct_terminating:
-  forall s c s', cexec s c s' ->
-  forall L s1, agree (live c L) s s1 ->
+  ∀ s c s', cexec s c s' ->
+  ∀ L s1, agree (live c L) s s1 ->
   ∃ s1', cexec s1 (dce c L) s1' /\ agree L s' s1' := by
     intro s c s' EXEC
     induction EXEC
