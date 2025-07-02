@@ -6,7 +6,7 @@ Authors: Wojciech Różowski
 
 def infseq {α} (R : α → α → Prop) : α → Prop :=
   λ x : α => ∃ y, R x y ∧ infseq R y
-  greatest_fixpoint
+  coinductive_fixpoint
 
 -- Application of the rewrite rule
 def infseq_fixpoint {α} (R : α → α → Prop) (x : α) :
@@ -16,18 +16,18 @@ def infseq_fixpoint {α} (R : α → α → Prop) (x : α) :
 -- The associated coinduction principle
 theorem infseq.coind {α} (h : α → Prop) (R : α → α → Prop)
     (prem : ∀ (x : α), h x → ∃ y, R x y ∧ h y) : ∀ x, h x → infseq R x := by
-  apply infseq.fixpoint_induct
+  apply infseq.coinduct
   grind
 
 /--
-info: infseq.fixpoint_induct.{u_1} {α : Sort u_1} (R : α → α → Prop) (x : α → Prop)
-  (y : ∀ (x_1 : α), x x_1 → ∃ y, R x_1 y ∧ x y) (x✝ : α) : x x✝ → infseq R x✝
+info: infseq.coinduct.{u_1} {α : Sort u_1} (R : α → α → Prop) (x : α → Prop) (y : ∀ (x_1 : α), x x_1 → ∃ y, R x_1 y ∧ x y)
+  (x✝ : α) : x x✝ → infseq R x✝
 -/
-#guard_msgs in #check infseq.fixpoint_induct
+#guard_msgs in #check infseq.coinduct
 
 -- Simple proof by coinduction
 theorem cycle_infseq {R : α → α → Prop} (x : α) : R x x → infseq R x := by
-  apply infseq.fixpoint_induct R (λ m => R m m)
+  apply infseq.coinduct R (λ m => R m m)
   grind
 
 @[grind] inductive star (R : α → α → Prop) : α → α → Prop where
@@ -96,7 +96,7 @@ def all_seq_inf (R : α → α → Prop) (x : α) : Prop :=
   ∀ y : α, star R x y → ∃ z, R y z
 
 def infseq_if_all_seq_inf (R : α → α → Prop) : ∀ x, all_seq_inf R x → infseq R x := by
-  apply infseq.fixpoint_induct
+  apply infseq.coinduct
   intro x H
   apply Exists.elim (H x (by simp only [star.star_refl]))
   intro y Rxy
@@ -114,7 +114,7 @@ theorem infseq_coinduction_principle_2:
   ∀ (a : α), x a → infseq R a := by
     intro X
     intro h₁ a rel
-    apply infseq.fixpoint_induct _ (fun a => ∃ b, star R a b ∧ X b)
+    apply infseq.coinduct _ (fun a => ∃ b, star R a b ∧ X b)
     case x => grind
     case y => grind [cases plus]
 
