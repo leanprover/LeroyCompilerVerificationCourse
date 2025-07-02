@@ -147,8 +147,7 @@ def smart_Ibranch (d: Int) : List instr:=
 @[grind] theorem codelen_app:
   forall c1 c2, codelen (c1 ++ c2) = codelen c1 + codelen c2 := by
     intro c1 _
-    induction c1
-    all_goals grind
+    induction c1 with grind
 
 @[grind =>] theorem instr_a : forall i c2 c1 pc,
   pc = codelen c1 ->
@@ -182,9 +181,7 @@ theorem code_at_head :
     intro C pc i C' h
     cases h
     case code_at_intro c1 c3 a =>
-      have s : c1 ++ i :: C' ++ c3 = c1 ++ [i] ++ C' ++ c3 := by grind [List.append_cons]
-      rw [s]
-      apply code_at.code_at_intro
+      have s : c1 ++ i :: C' ++ c3 = c1 ++ [i] ++ C' ++ c3 := by grind
       grind
 
 @[grind] theorem code_at_app_left:
@@ -261,14 +258,14 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
       apply star_one
       apply transition.trans_const
       cases a
-      next => simp ; apply instr_a; grind
+      next => grind
     next =>
       simp [aeval, compile_aexp]
       intro a
       apply star_one
       apply transition.trans_var
       cases a
-      next => simp ; apply instr_a; grind
+      next => grind
     next a1 a2 a1_ih a2_ih =>
       simp [aeval, compile_aexp]
       intro a
@@ -284,14 +281,13 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
           next c1 c3 a =>
             have h1 := instr_a instr.Iadd c3 (c1 ++ compile_aexp a1 ++ compile_aexp a2) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) (by grind)
             have h2 := @transition.trans_add ((c1 ++ compile_aexp a1 ++ compile_aexp a2) ++ (instr.Iadd :: c3)) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) stk s (aeval s a1) (aeval s a2) (by grind)
-            simp [codelen] at *
             grind
     next a1 a2 a1_ih a2_ih =>
       simp [aeval, compile_aexp]
       intro a
       apply star_trans
       . apply a1_ih
-        . grind
+        grind
       . apply star_trans
         . specialize a2_ih C (pc + codelen (compile_aexp a1)) (aeval s a1 :: stk)
           apply a2_ih
@@ -304,7 +300,6 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
           . apply star_one
             . have := @code_at_to_instr_at C pc (compile_aexp a1 ++ compile_aexp a2 ++ [instr.Iopp])  instr.Iadd [] (by grind [List.append_assoc, List.cons_append, List.nil_append])
               have := @transition.trans_add C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2) + 1) stk s (aeval s a1) (-aeval s a2) (by simp [codelen] at *; grind)
-              simp [codelen] at *
               grind
 -- Miss 5
 theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : Int) (pc : Int) (stk : stack) (h : code_at C pc (compile_bexp b d1 d0))  :
@@ -346,14 +341,12 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
       . apply compile_aexp_correct
         rotate_left
         . exact a1
-        . simp [compile_bexp] at h
-          grind
+        . grind
       . apply star_trans
         . apply compile_aexp_correct
           rotate_right
           . exact a2
-          . simp [compile_bexp] at h
-            grind
+          . grind
         . apply star_one
           . apply transition.trans_beq
             rotate_left; rotate_left
@@ -368,14 +361,12 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
       . apply compile_aexp_correct
         rotate_left
         . exact a1
-        . simp [compile_bexp] at h
-          grind
+        . grind
       . apply star_trans
         . apply compile_aexp_correct
           rotate_right
           . exact a2
-          . simp [compile_bexp] at h
-            grind
+          . grind
         . apply star_one
           . apply transition.trans_ble
             rotate_left; rotate_left
@@ -385,8 +376,6 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
               grind
             . grind
     next b1 ih =>
-      simp [compile_bexp, beval] at *
-      have := ih d0 d1 pc
       grind
     next b1 b2 b1_ih b2_ih =>
       generalize heq1 : compile_bexp b2 d1 d0 = code2
@@ -398,11 +387,7 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
         rotate_left
         . exact 0
         . exact (codelen code2 + d0)
-        . rw [heq2]
-          unfold compile_bexp at h
-          simp [heq1, heq2] at h
-          apply code_at_app_left
-          exact h
+        . grind
       . by_cases beval s b1 = true
         case pos isTrue =>
           simp [isTrue]
@@ -476,19 +461,13 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
         simp [isTrue]
         apply star_trans
         . apply ih
-          simp [isTrue, heq1, heq3]
           grind
         . apply star_one
           . apply transition.trans_branch
             rotate_right
             . exact codelen code2
-            . simp [isTrue]
-              rw [heq3, heq1]
-              have := @code_at_to_instr_at C pc (code3 ++ code1) (instr.Ibranch (codelen code2)) code2 (by grind)
-              simp [codelen] at *
-              grind
-            . rw [heq3]
-              grind
+            . grind
+            . grind
       case neg isFalse =>
         simp [isFalse]
         rw [heq3]
@@ -501,8 +480,6 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
           rw [this] at ih
           apply ih
         have := @code_at_app_right C pc (code3 ++ code1 ++ [instr.Ibranch (codelen code2)]) code2 (by simp[h])
-        simp [codelen_app, codelen_singleton] at this
-        rw [heq2]
         grind
   case cexec_while_done s b c1 isFalse =>
     intro C pc stk h
@@ -513,9 +490,8 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
     rw [heq1, heq2, heq3]
     simp [codelen_app, codelen_singleton]
     apply star_trans
-    .  apply compile_bexp_correct C s b 0 (codelen code_body + 1) pc stk (by grind)
-    . simp [isFalse]
-      grind
+    . apply compile_bexp_correct C s b 0 (codelen code_body + 1) pc stk (by grind)
+    . grind
   case cexec_while_loop s b c1 s_intermediate s' isTrue cexec1 cexec2 ih1 ih2 =>
     intro C pc stk
     generalize heq1 : compile_com c1 = code_body
@@ -539,11 +515,7 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
           rotate_left
           . exact d
           . exact (pc + codelen code_branch + codelen code_body + 1 + d)
-          . apply @code_at_to_instr_at
-            rotate_left
-            . exact []
-            . apply code_at_app_right
-              grind [List.append_assoc]
+          . grind
           . grind
         . specialize ih2 C (pc + codelen code_branch + codelen code_body + 1 + d) stk
           suffices h2 : code_at C (pc + codelen code_branch + codelen code_body + 1 + d) (compile_com (com.WHILE b c1)) from by
@@ -557,12 +529,6 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
       (codelen code_branch + (codelen code_body + codelen [instr.Ibranch d])) ) = (pc + (codelen code_branch + (codelen code_body + codelen [instr.Ibranch d]))) := by grind
             rw [←this]
             apply ih2
-          rw [←heq3]
-          suffices h3 : (pc + codelen code_branch + codelen code_body + 1 + -(codelen code_branch + codelen code_body + 1)) = pc from by
-            rw [h3]
-            simp [compile_com]
-            rw [heq1, heq2, heq3]
-            exact h
           grind
 
 inductive compile_cont (C: List instr) : cont -> Int -> Prop where
@@ -596,7 +562,7 @@ inductive match_config (C: List instr): com × cont × store -> config -> Prop w
 def com_size (c: com) : Nat :=
   match c with
   | .SKIP => 1
-  |.ASSIGN _ _ => 1
+  | .ASSIGN _ _ => 1
   | (c1 ;; c2) => (com_size c1 + com_size c2 + 1)
   | .IFTHENELSE _ c1 c2 => (com_size c1 + com_size c2 + 1)
   | .WHILE _ c1 => (com_size c1 + 1)
@@ -625,7 +591,7 @@ theorem compile_cont_Kstop_inv (C : List instr) (pc : Int) (s : store):
     generalize h₁ : cont.Kstop = a₁
     generalize h₂ : pc = a₂
     rw [h₁, h₂] at H
-    induction H generalizing pc <;> grind
+    induction H generalizing pc with grind
 
 theorem compile_cont_Kseq_inv (C : List instr) (c : com) (k :cont) (pc : Int) (s : store) (H : compile_cont C (.Kseq c k) pc):
   ∃ pc',
@@ -635,8 +601,7 @@ theorem compile_cont_Kseq_inv (C : List instr) (c : com) (k :cont) (pc : Int) (s
     generalize h₁ : (cont.Kseq c k) = a₁
     generalize h₂ : pc = a₂
     rw [h₁, h₂] at H
-    induction H generalizing pc k
-    all_goals grind
+    induction H generalizing pc k with grind
 
 theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont) (pc : Int) (s : store) (H : compile_cont C (.Kwhile b c k) pc):
   ∃ pc',
@@ -664,8 +629,7 @@ theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont)
         . apply transition.trans_branch
           rotate_left
           . exact rfl
-          . rw [←h₂] at h₃
-            exact h₃
+          . grind
       . grind
     case ccont_while b' c' k' pc₂ d pc₃ pc₄ h₃ h₄ h₅ h₆ h₇ ih =>
       exists (pc + 1 + d)
@@ -679,10 +643,8 @@ theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont)
 theorem match_config_skip (C : List instr) (k : cont) (s : store) (pc : Int) (H: compile_cont C k pc):
  match_config C (.SKIP, k, s) (pc, [], s) := by
   constructor
-  . simp [compile_com]
-    cases H <;> grind
-  . simp [compile_com, codelen]
-    exact H
+  . cases H <;> grind
+  . grind
 
 theorem simulation_step:
   forall C impconf1 impconf2 machconf1,
@@ -708,15 +670,12 @@ theorem simulation_step:
           rotate_left
           exact a
           rotate_left
-          . simp [compile_com] at h₁
-            grind
+          . grind
           . apply transition.trans_setvar
-            simp [compile_com] at h₁
             rotate_left
             exact x
             grind
         apply match_config_skip
-        simp [compile_com] at h₂
         grind
       next c2 =>
         constructor
@@ -749,8 +708,7 @@ theorem simulation_step:
           . exact b
           . exact 0
           . exact (codelen code1 + 1)
-          . rw [h₄]
-            grind
+          . grind
         . simp [measure', com_size]
           grind
         . rw [h₄]
@@ -790,8 +748,7 @@ theorem simulation_step:
           . exact b
           . exact 0
           . exact (codelen codec + 1)
-          . simp [compile_com] at h₁
-            grind
+          . grind
         . simp [measure', com_size]
           fun_induction com_size <;> grind
         . simp [isFalse]
@@ -799,10 +756,8 @@ theorem simulation_step:
           simp [compile_com] at h₂ h₁
           rw [h₃, h₄] at h₂ h₁
           constructor
-          . simp [compile_com]
-            grind
-          . simp [codelen_app] at h₂
-            grind
+          . grind
+          . grind
       next b isTrue =>
         generalize h₃ : compile_com c' = codec
         generalize h₄ : compile_bexp b 0 (codelen codec + 1) = codeb
@@ -815,8 +770,7 @@ theorem simulation_step:
             . exact b
             . exact 0
             . exact (codelen codec + 1)
-            . simp [compile_com] at h₁
-              grind
+            . grind
           . simp [measure', cont_size, com_size]
         . simp [isTrue]
           rw [h₄]
@@ -908,7 +862,7 @@ theorem match_initial_configs:
       grind [List.nil_append]
     . simp [compile_program, heq]
       constructor
-      grind [instr_at_len]
+      grind
 
 theorem compile_program_correct_terminating_2:
   forall c s s',
@@ -974,8 +928,7 @@ theorem compile_program_correct_diverging:
       constructor
       . exact H
       . have := match_initial_configs c s
-        rw [heq] at this
-        exact this
+        grind
     . intro machconf ⟨ impconf , ⟨INFSEQ, MATCH ⟩⟩
       have ⟨impconf2 , machconf2, INFSEQ2 , PLUS , MATCH2⟩  := simulation_infseq_inv C (measure' impconf +1) impconf machconf INFSEQ MATCH (by omega)
       exists machconf2
