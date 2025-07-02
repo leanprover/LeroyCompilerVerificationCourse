@@ -75,7 +75,7 @@ theorem plus_one : ∀ a b, R a b → plus R a b := by
     exact rel
     grind
 
-theorem star_plus_trans:
+theorem star_plus_trans :
   ∀ a b c, star R a b -> plus R b c -> plus R a c := by
     intro a b c H0 H1
     cases H0
@@ -86,7 +86,7 @@ theorem star_plus_trans:
       · exact a1
       · grind
 
-theorem plus_right:
+theorem plus_right :
   ∀ a b c, star R a b -> R b c -> plus R a c := by
   intro a b c h₁ h₂
   grind [star_plus_trans, plus_one]
@@ -108,7 +108,7 @@ def infseq_if_all_seq_inf (R : α → α → Prop) : ∀ x, all_seq_inf R x → 
     apply H
     grind
 
-theorem infseq_coinduction_principle_2:
+theorem infseq_coinduction_principle_2 :
   ∀ (x : α → Prop),
   (∀ (a : α), x a → ∃ b, plus R a b ∧ x b) →
   ∀ (a : α), x a → infseq R a := by

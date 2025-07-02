@@ -14,7 +14,7 @@ universe u
   eq : α → α → Prop
   le : α → α → Prop
   beq : α → α → Bool
-  le_trans: ∀ x y z, le x y -> le y z -> le x z
+  le_trans : ∀ x y z, le x y -> le y z -> le x z
   beq_true' : ∀ x y : α, beq x y = true → eq x y
   beq_false' : ∀ x y : α, beq x y = false → ¬ eq x y
   gt_wf : WellFounded (fun x y : α => le y x ∧ ¬eq y x)
@@ -71,13 +71,13 @@ instance : WellFoundedRelation α  where
   rel := gt
   wf := gt_wf
 
-@[grind] def iterate (x : α) (PRE: le x (F x)) (SMALL: ∀ z, le (F z) z -> le x z) : α :=
+@[grind] def iterate (x : α) (PRE : le x (F x)) (SMALL : ∀ z, le (F z) z -> le x z) : α :=
   if beq x (F x) then x else iterate (F x) (by apply F_mon; exact PRE) (by intro z hyp; specialize SMALL z hyp; apply le_trans; apply F_mon; exact SMALL; exact hyp)
   termination_by x
   decreasing_by
     grind [beq_false']
 
-@[grind] theorem iterate_correct (x : α) (PRE: le x (F x)) (SMALL: ∀ z, le (F z) z -> le x z) (heq : y = iterate _ F x PRE SMALL ) : eq y (F y) ∧ ∀ z, le (F z) z → le y z := by
+@[grind] theorem iterate_correct (x : α) (PRE : le x (F x)) (SMALL : ∀ z, le (F z) z -> le x z) (heq : y = iterate _ F x PRE SMALL ) : eq y (F y) ∧ ∀ z, le (F z) z → le y z := by
   fun_induction iterate
   case case1 x' PRE SMALL isTrue  =>
     constructor
@@ -150,7 +150,7 @@ theorem hash_set_incl_size_leq (S1 S2 : Store) : Le S2 S1 → List.Subperm (S1.t
     specialize LE k v (by grind)
     grind
 
-@[grind] theorem Le_cardinal:
+@[grind] theorem Le_cardinal :
   ∀ S T : Store,
   Le T S ->
   S.size <= T.size ∧ (S.size = T.size → Equal S T) := by
@@ -167,7 +167,7 @@ theorem hash_set_incl_size_leq (S1 S2 : Store) : Le S2 S1 → List.Subperm (S1.t
       apply List.Subperm.perm_of_length_le (hash_set_incl_size_leq S T hyp)
       grind
 
-@[grind] theorem Gt_cardinal:
+@[grind] theorem Gt_cardinal :
   ∀ S S', Gt S S' -> S.size < S'.size := by
     intro S S' hyp
     unfold Gt at hyp
@@ -217,7 +217,7 @@ instance : Monotone Store (fun x => Join Init (F x)) where
     simp at *
     unfold Le at *
     intro z n isSome
-    have ⟨ h1, h2 ⟩:= (Join_characterization Init (F y) z n).1 isSome
+    have ⟨h1, h2⟩ := (Join_characterization Init (F y) z n).1 isSome
     apply (Join_characterization (Init) (F x) z n).2
     constructor
     · exact h1
@@ -236,7 +236,7 @@ noncomputable def fixpoint_join : Store := by
   specialize hyp x n hyp2
   grind
 
-theorem fixpoint_join_eq: Eq' (Join Init (F (fixpoint_join Init F) )) (fixpoint_join Init F) := by
+theorem fixpoint_join_eq : Eq' (Join Init (F (fixpoint_join Init F) )) (fixpoint_join Init F) := by
   generalize heq1 : fixpoint_join Init F = t
   apply Eq'_sym
   simp [fixpoint_join] at *
@@ -269,7 +269,7 @@ theorem fixpoint_join_sound : Le Init (fixpoint_join Init F) /\ Le (F (fixpoint_
     · exact LE
     · apply Le_Join_r
 
-theorem fixpoint_join_smallest:
+theorem fixpoint_join_smallest :
   ∀ S, Le (Join Init (F S)) S -> Le (fixpoint_join Init F) S := by
     intro S LE
     unfold fixpoint_join
@@ -288,13 +288,13 @@ theorem fixpoint_join_smallest:
     · unfold fixpoint_join
       dsimp
 
-@[grind] theorem Join_increasing:
+@[grind] theorem Join_increasing :
   ∀ S1 S2 S3 S4,
   Le S1 S2 -> Le S3 S4 -> Le (Join S1 S3) (Join S2 S4) := by
     intros
     grind
 
-@[grind] theorem Aeval_increasing: ∀ S1 S2, Le S1 S2 ->
+@[grind] theorem Aeval_increasing : ∀ S1 S2, Le S1 S2 ->
   ∀ a n, Aeval S2 a = .some n -> Aeval S1 a =.some n := by
     intro S1 S2 LE a
     induction a <;> grind
@@ -309,7 +309,7 @@ theorem fixpoint_join_smallest:
       simp [Beval, lift1] at ev
       grind
 
-theorem Update_increasing:
+theorem Update_increasing :
   ∀ S1 S2 x a,
   Le S1 S2 ->
   Le (Update x (Aeval S1 a) S1) (Update x (Aeval S2 a) S2) := by
@@ -320,11 +320,11 @@ end FixpointJoin
 noncomputable instance wrapper (F : Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) : Monotone Store F where
   F_mon := by grind
 
-noncomputable def fixpoint_join' (S : Store) (F: Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) := by
+noncomputable def fixpoint_join' (S : Store) (F : Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) := by
   have := wrapper F (by grind)
   exact fixpoint_join S F
 
-theorem fixpoint_join_increasing (_ : Store) (F: Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) (S1 S2: Store) : le S1 S2 → le (fixpoint_join' S1 F F_mon) (fixpoint_join' S2 F F_mon) := by
+theorem fixpoint_join_increasing (_ : Store) (F : Store → Store) (F_mon : ∀ x y, le x y → le (F x) (F y)) (S1 S2 : Store) : le S1 S2 → le (fixpoint_join' S1 F F_mon) (fixpoint_join' S2 F F_mon) := by
   intro hyp
   apply @fixpoint_join_smallest S1 F (by grind [wrapper]) (fixpoint_join' S2 F F_mon)
   generalize heq : fixpoint_join' S2 F F_mon = fix2

@@ -7,18 +7,18 @@ Authors: Wojciech Różowski
 import LeroyCompilerVerificationCourse.Imp
 
 @[grind] inductive instr : Type where
-  | Iconst (n: Int)
-  | Ivar (x: ident)
-  | Isetvar (x: ident)
+  | Iconst (n : Int)
+  | Ivar (x : ident)
+  | Isetvar (x : ident)
   | Iadd
   | Iopp
-  | Ibranch (d: Int)
-  | Ibeq (d1: Int) (d0: Int)
-  | Ible (d1: Int) (d0: Int)
+  | Ibranch (d : Int)
+  | Ibeq (d1 : Int) (d0 : Int)
+  | Ible (d1 : Int) (d0 : Int)
   | Ihalt
     deriving Repr
 
-@[grind] def codelen (c: List instr) : Int := c.length
+@[grind] def codelen (c : List instr) : Int := c.length
 
 def stack : Type := List Int
 
@@ -29,7 +29,7 @@ def config : Type := Int × stack × store
   | [] => .none
   | i :: C' => if pc = 0 then .some i else instr_at C' (pc - 1)
 
-@[grind] inductive transition (C: List instr): config → config → Prop where
+@[grind] inductive transition (C : List instr) : config → config → Prop where
   | trans_const : ∀ pc stk s n,
       instr_at C pc = .some (.Iconst n) →
       transition C (pc    , stk     , s)
@@ -38,58 +38,58 @@ def config : Type := Int × stack × store
       instr_at C pc = .some (.Ivar x) ->
       transition C (pc    , stk       , s)
                    (pc + 1, s x :: stk, s)
-  | trans_setvar: ∀ pc stk s x n,
+  | trans_setvar : ∀ pc stk s x n,
       instr_at C pc = .some (.Isetvar x) ->
       transition C (pc    , n :: stk, s)
                    (pc + 1, stk     , update x n s)
-  | trans_add: ∀ pc stk s n1 n2,
+  | trans_add : ∀ pc stk s n1 n2,
       instr_at C pc = .some (.Iadd) ->
       transition C (pc    , n2 :: n1 :: stk , s)
                    (pc + 1, (n1 + n2) :: stk, s)
-  | trans_opp: ∀ pc stk s n,
+  | trans_opp : ∀ pc stk s n,
       instr_at C pc = .some (.Iopp) ->
       transition C (pc    , n :: stk    , s)
                    (pc + 1, (- n) :: stk, s)
-  | trans_branch: ∀ pc stk s d pc',
+  | trans_branch : ∀ pc stk s d pc',
       instr_at C pc = .some (.Ibranch d) ->
       pc' = pc + 1 + d ->
       transition C (pc , stk, s)
                    (pc', stk, s)
-  | trans_beq: ∀ pc stk s d1 d0 n1 n2 pc',
+  | trans_beq : ∀ pc stk s d1 d0 n1 n2 pc',
       instr_at C pc = .some (.Ibeq d1 d0) ->
       pc' = pc + 1 + (if n1 = n2 then d1 else d0) ->
       transition C (pc , n2 :: n1 :: stk, s)
                    (pc', stk            , s)
-  | trans_ble: ∀ pc stk s d1 d0 n1 n2 pc',
+  | trans_ble : ∀ pc stk s d1 d0 n1 n2 pc',
       instr_at C pc = .some (.Ible d1 d0) ->
       pc' = pc + 1 + (if n1 ≤ n2 then d1 else d0) ->
       transition C (pc , n2 :: n1 :: stk, s)
                    (pc', stk            , s)
 
-@[grind] def transitions (C: List instr) : config → config → Prop :=
+@[grind] def transitions (C : List instr) : config → config → Prop :=
   star (transition C)
 
-def machine_terminates (C: List instr) (s_init: store) (s_final: store) : Prop :=
+def machine_terminates (C : List instr) (s_init : store) (s_final : store) : Prop :=
   ∃ pc, transitions C (0, [], s_init) (pc, [], s_final)
           ∧ instr_at C pc = .some .Ihalt
 
-def machine_diverges (C: List instr) (s_init: store) : Prop :=
+def machine_diverges (C : List instr) (s_init : store) : Prop :=
   infseq (transition C) (0, [], s_init)
 
-def machine_goes_wrong (C: List instr) (s_init: store) : Prop :=
+def machine_goes_wrong (C : List instr) (s_init : store) : Prop :=
   ∃ pc stk s,
       transitions C (0, [], s_init) (pc, stk, s)
    ∧ irred (transition C) (pc, stk, s)
    ∧ (instr_at C pc ≠ .some .Ihalt ∨ stk ≠ [])
 
-@[grind] def compile_aexp (a: aexp) : List instr :=
+@[grind] def compile_aexp (a : aexp) : List instr :=
   match a with
   | .CONST n => .Iconst n :: []
   | .VAR x => .Ivar x :: []
   | .PLUS a1 a2  => (compile_aexp a1) ++ (compile_aexp a2) ++ (.Iadd :: [])
   | .MINUS a1 a2 => compile_aexp a1 ++ compile_aexp a2 ++ (.Iopp :: .Iadd :: [])
 
-@[grind] def compile_bexp (b: bexp) (d1: Int) (d0: Int) : List instr :=
+@[grind] def compile_bexp (b : bexp) (d1 : Int) (d0 : Int) : List instr :=
   match b with
   | .TRUE => if d1 = 0 then [] else .Ibranch d1 :: []
   | .FALSE => if d0 = 0 then [] else .Ibranch d0 :: []
@@ -101,7 +101,7 @@ def machine_goes_wrong (C: List instr) (s_init: store) : Prop :=
       let code1 := compile_bexp b1 0 (codelen code2 + d0)
       code1 ++ code2
 
-@[grind] def compile_com (c: com) : List instr:=
+@[grind] def compile_com (c : com) : List instr :=
   match c with
   | .SKIP =>
       []
@@ -123,28 +123,28 @@ def machine_goes_wrong (C: List instr) (s_init: store) : Prop :=
       ++ code_body
       ++ .Ibranch (- (codelen code_test + codelen code_body + 1)) :: []
 
-def compile_program (p: com) : List instr:=
+def compile_program (p : com) : List instr :=
   compile_com p ++ .Ihalt :: []
 
 /-- info: [instr.Ivar "x", instr.Iconst 1, instr.Iadd, instr.Isetvar "x", instr.Ihalt] -/
 #guard_msgs in
 #eval (compile_program (.ASSIGN "x" (.PLUS (.VAR "x") (.CONST 1))))
 
-def smart_Ibranch (d: Int) : List instr:=
+def smart_Ibranch (d : Int) : List instr :=
   if d = 0 then [] else .Ibranch d :: []
 
-@[grind] inductive code_at: List instr -> Int -> List instr-> Prop where
-  | code_at_intro: ∀ C1 C2 C3 pc,
+@[grind] inductive code_at : List instr -> Int -> List instr-> Prop where
+  | code_at_intro : ∀ C1 C2 C3 pc,
       pc = codelen C1 ->
       code_at (C1 ++ C2 ++ C3) pc C2
 
-@[grind] theorem codelen_cons:
+@[grind] theorem codelen_cons :
   ∀ i c, codelen (i :: c) = codelen c + 1 := by grind
 
 @[grind] theorem codelen_singleton : codelen [i] = 1 := by
   dsimp [codelen]
 
-@[grind] theorem codelen_app:
+@[grind] theorem codelen_app :
   ∀ c1 c2, codelen (c1 ++ c2) = codelen c1 + codelen c2 := by
     intro c1 _
     induction c1 with grind
@@ -155,7 +155,7 @@ def smart_Ibranch (d: Int) : List instr:=
     intro i c2 c1 pc
     induction c1 generalizing pc with grind
 
-@[grind] theorem instr_at_app:
+@[grind] theorem instr_at_app :
   ∀ i c2 c1 pc,
   pc = codelen c1 ->
   instr_at (c1 ++ (i :: c2)) pc = .some i := by
@@ -184,7 +184,7 @@ theorem code_at_head :
       have s : c1 ++ i :: C' ++ c3 = c1 ++ [i] ++ C' ++ c3 := by grind
       grind
 
-@[grind] theorem code_at_app_left:
+@[grind] theorem code_at_app_left :
   ∀ C pc C1 C2,
   code_at C pc (C1 ++ C2) ->
   code_at C pc C1 := by
@@ -194,7 +194,7 @@ theorem code_at_head :
       have := code_at.code_at_intro c1 m1 (m2 ++ c3) pc a
       grind [List.append_assoc]
 
-@[grind] theorem code_at_app_right:
+@[grind] theorem code_at_app_right :
   ∀ C pc C1 C2,
   code_at C pc (C1 ++ C2) ->
   code_at C (pc + codelen C1) C2 := by
@@ -531,35 +531,35 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
             apply ih2
           grind
 
-inductive compile_cont (C: List instr) : cont -> Int -> Prop where
-  | ccont_stop: ∀ pc,
+inductive compile_cont (C : List instr) : cont -> Int -> Prop where
+  | ccont_stop : ∀ pc,
       instr_at C pc = .some .Ihalt ->
       compile_cont C .Kstop pc
-  | ccont_seq: ∀ c k pc pc',
+  | ccont_seq : ∀ c k pc pc',
       code_at C pc (compile_com c) ->
       pc' = pc + codelen (compile_com c) ->
       compile_cont C k pc' ->
       compile_cont C (.Kseq c k) pc
-  | ccont_while: ∀ b c k pc d pc' pc'',
+  | ccont_while : ∀ b c k pc d pc' pc'',
       instr_at C pc = .some (.Ibranch d) ->
       pc' = pc + 1 + d ->
       code_at C pc' (compile_com (.WHILE b c)) ->
       pc'' = pc' + codelen (compile_com (.WHILE b c)) ->
       compile_cont C k pc'' ->
       compile_cont C (.Kwhile b c k) pc
-  | ccont_branch: ∀ d k pc pc',
+  | ccont_branch : ∀ d k pc pc',
       instr_at C pc = .some (.Ibranch d) ->
       pc' = pc + 1 + d ->
       compile_cont C k pc' ->
       compile_cont C k pc
 
-inductive match_config (C: List instr): com × cont × store -> config -> Prop where
-  | match_config_intro: ∀ c k st pc,
+inductive match_config (C : List instr) : com × cont × store -> config -> Prop where
+  | match_config_intro : ∀ c k st pc,
       code_at C pc (compile_com c) ->
       compile_cont C k (pc + codelen (compile_com c)) ->
       match_config C (c, k, st) (pc, [], st)
 
-def com_size (c: com) : Nat :=
+def com_size (c : com) : Nat :=
   match c with
   | .SKIP => 1
   | .ASSIGN _ _ => 1
@@ -568,21 +568,21 @@ def com_size (c: com) : Nat :=
   | .WHILE _ c1 => (com_size c1 + 1)
 
 
-theorem com_size_nonzero: ∀ c, (com_size c > 0) := by
+theorem com_size_nonzero : ∀ c, (com_size c > 0) := by
   intro c
   fun_induction com_size with grind
 
-def cont_size (k: cont) : Nat :=
+def cont_size (k : cont) : Nat :=
   match k with
   | .Kstop => 0
   | .Kseq c k' => (com_size c + cont_size k')
   | .Kwhile _ _ k' => cont_size k'
 
-def measure' (impconf: com × cont × store) : Nat :=
+def measure' (impconf : com × cont × store) : Nat :=
   match impconf with
   | (c, k, _) => (com_size c + cont_size k)
 
-theorem compile_cont_Kstop_inv (C : List instr) (pc : Int) (s : store):
+theorem compile_cont_Kstop_inv (C : List instr) (pc : Int) (s : store) :
   compile_cont C .Kstop pc →
   ∃ pc',
   star (transition C) (pc, [], s) (pc', [], s)
@@ -593,7 +593,7 @@ theorem compile_cont_Kstop_inv (C : List instr) (pc : Int) (s : store):
     rw [h₁, h₂] at H
     induction H generalizing pc with grind
 
-theorem compile_cont_Kseq_inv (C : List instr) (c : com) (k :cont) (pc : Int) (s : store) (H : compile_cont C (.Kseq c k) pc):
+theorem compile_cont_Kseq_inv (C : List instr) (c : com) (k :cont) (pc : Int) (s : store) (H : compile_cont C (.Kseq c k) pc) :
   ∃ pc',
   star (transition C) (pc, [], s) (pc', [], s)
   ∧ code_at C pc' (compile_com c)
@@ -603,7 +603,7 @@ theorem compile_cont_Kseq_inv (C : List instr) (c : com) (k :cont) (pc : Int) (s
     rw [h₁, h₂] at H
     induction H generalizing pc k with grind
 
-theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont) (pc : Int) (s : store) (H : compile_cont C (.Kwhile b c k) pc):
+theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont) (pc : Int) (s : store) (H : compile_cont C (.Kwhile b c k) pc) :
   ∃ pc',
   plus (transition C) (pc, [], s) (pc', [], s)
   ∧ code_at C pc' (compile_com (.WHILE b c))
@@ -640,13 +640,13 @@ theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont)
       · exact d
       any_goals grind
 
-theorem match_config_skip (C : List instr) (k : cont) (s : store) (pc : Int) (H: compile_cont C k pc):
+theorem match_config_skip (C : List instr) (k : cont) (s : store) (pc : Int) (H : compile_cont C k pc) :
  match_config C (.SKIP, k, s) (pc, [], s) := by
   constructor
   · cases H <;> grind
   · grind
 
-theorem simulation_step:
+theorem simulation_step :
   ∀ C impconf1 impconf2 machconf1,
   step impconf1 impconf2 ->
   match_config C impconf1 machconf1 ->
@@ -817,7 +817,7 @@ theorem simulation_step:
           · exact w₂.1
           · exact w₂.2
 
-theorem simulation_steps:
+theorem simulation_steps :
   ∀ C impconf1 impconf2, star step impconf1 impconf2 ->
   ∀ machconf1, match_config C impconf1 machconf1 ->
   ∃ machconf2,
@@ -851,7 +851,7 @@ theorem simulation_steps:
 theorem instr_at_len : instr_at (C ++ [i]) (codelen C) = .some i := by
   induction C with grind
 
-theorem match_initial_configs:
+theorem match_initial_configs :
   ∀ c s,
   match_config (compile_program c) (c, .Kstop, s) (0, [], s) := by
     intro c s
@@ -864,7 +864,7 @@ theorem match_initial_configs:
       constructor
       grind
 
-theorem compile_program_correct_terminating_2:
+theorem compile_program_correct_terminating_2 :
   ∀ c s s',
   star step (c, .Kstop, s) (.SKIP, .Kstop, s') ->
   machine_terminates (compile_program c) s s' := by
@@ -882,7 +882,7 @@ theorem compile_program_correct_terminating_2:
           exact D
       · exact E
 
-theorem simulation_infseq_inv:
+theorem simulation_infseq_inv :
   ∀ C n impconf1 machconf1,
   infseq step impconf1 -> match_config C impconf1 machconf1 ->
   (measure' impconf1 < n) ->
@@ -915,7 +915,7 @@ theorem simulation_infseq_inv:
             · exact w.2.1
           · exact w.2.2
 
-theorem compile_program_correct_diverging:
+theorem compile_program_correct_diverging :
   ∀ c s,
   infseq step (c, .Kstop, s) ->
   machine_diverges (compile_program c) s := by
