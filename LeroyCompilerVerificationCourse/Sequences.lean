@@ -14,7 +14,7 @@ def infseq_fixpoint {α} (R : α → α → Prop) (x : α) :
   rw [infseq]
 
 -- The associated coinduction principle
-theorem infseq.coind {α} (h : α → Prop) (R : α → α → Prop)
+theorem infseq_coinduction_principle {α} (h : α → Prop) (R : α → α → Prop)
     (prem : ∀ (x : α), h x → ∃ y, R x y ∧ h y) : ∀ x, h x → infseq R x := by
   apply infseq.coinduct
   grind
@@ -95,6 +95,9 @@ theorem plus_right :
 def all_seq_inf (R : α → α → Prop) (x : α) : Prop :=
   ∀ y : α, star R x y → ∃ z, R y z
 
+def infseq_with_function (R : α → α → Prop) (a: α) : Prop :=
+  ∃ f : Nat → α, f 0 = a ∧ ∀ i, R (f i) (f (1 + i))
+
 def infseq_if_all_seq_inf (R : α → α → Prop) : ∀ x, all_seq_inf R x → infseq R x := by
   apply infseq.coinduct
   intro x H
@@ -117,6 +120,20 @@ theorem infseq_coinduction_principle_2 :
     apply infseq.coinduct _ (fun a => ∃ b, star R a b ∧ X b)
     case x => grind
     case y => grind [cases plus]
+
+theorem infseq_from_function : ∀ a, infseq_with_function R a → infseq R a := by
+  apply infseq.coinduct
+  intro x hyp
+  unfold infseq_with_function at hyp
+  have ⟨f , ⟨h0, hsucc⟩⟩ := hyp
+  refine ⟨f 1, ?_⟩
+  refine ⟨by grind, ?_⟩
+  unfold infseq_with_function
+  refine ⟨fun n => f (n + 1), ?_⟩
+  refine ⟨by grind, ?_⟩
+  intro i
+  specialize hsucc (i + 1)
+  grind
 
 @[grind] def irred (R : α → α → Prop) (a : α) : Prop := ∀ b, ¬(R a b)
 
