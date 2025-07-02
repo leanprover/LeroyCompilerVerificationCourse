@@ -5,9 +5,9 @@ Authors: Wojciech Różowski
 -/
 
 import LeroyCompilerVerificationCourse.Imp
-import Init.Data.List.Basic
 import Std.Data.HashSet
-import Std.Data.HashSet.Lemmas
+
+open Classical in
 
 open Classical in
 @[grind] def IdentSet := Std.HashSet ident
