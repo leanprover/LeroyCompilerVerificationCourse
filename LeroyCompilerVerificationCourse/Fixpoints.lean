@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under LGPL 2.1 license as described in the file LICENSE.md.
+Authors: Wojciech Różowski
+-/
+
 import LeroyCompilerVerificationCourse.Imp
 import LeroyCompilerVerificationCourse.Constprop
 import Init.WF
@@ -7,8 +13,6 @@ import Batteries.Data.List.Basic
 import Batteries.Data.List.Perm
 
 universe u
-
-set_option grind.warning false
 
 @[grind] class OrderStruct (α : Sort u) where
   eq : α → α → Prop
@@ -76,8 +80,6 @@ instance : WellFoundedRelation α  where
   termination_by x
   decreasing_by
     grind [beq_false']
-
-#check iterate
 
 @[grind] theorem iterate_correct (x : α) (PRE: le x (F x)) (SMALL: forall z, le (F z) z -> le x z) (heq : y = iterate _ F x PRE SMALL ) : eq y (F y) ∧ ∀ z, le (F z) z → le y z := by
   fun_induction iterate

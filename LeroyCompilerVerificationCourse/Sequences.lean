@@ -1,19 +1,24 @@
-set_option grind.warning false
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under LGPL 2.1 license as described in the file LICENSE.md.
+Authors: Wojciech Różowski
+-/
 
 def infseq {α} (R : α → α → Prop) : α → Prop :=
   λ x : α => ∃ y, R x y ∧ infseq R y
- greatest_fixpoint
+  greatest_fixpoint
 
 -- Application of the rewrite rule
 def infseq_fixpoint {α} (R : α → α → Prop) (x : α) :
-  infseq R x = ∃ y, R x y ∧ infseq R y := by
-    rw [infseq]
+    infseq R x = ∃ y, R x y ∧ infseq R y := by
+  rw [infseq]
 
 -- The associated coinduction principle
 theorem infseq.coind {α} (h : α → Prop) (R : α → α → Prop)
-  (prem : ∀ (x : α), h x → ∃ y, R x y ∧ h y) : ∀ x, h x → infseq R x := by
+    (prem : ∀ (x : α), h x → ∃ y, R x y ∧ h y) : ∀ x, h x → infseq R x := by
   apply infseq.fixpoint_induct
-  exact prem
+  grind
+
 /--
 info: infseq.fixpoint_induct.{u_1} {α : Sort u_1} (R : α → α → Prop) (x : α → Prop)
   (y : ∀ (x_1 : α), x x_1 → ∃ y, R x_1 y ∧ x y) (x✝ : α) : x x✝ → infseq R x✝
@@ -23,7 +28,6 @@ info: infseq.fixpoint_induct.{u_1} {α : Sort u_1} (R : α → α → Prop) (x :
 -- Simple proof by coinduction
 theorem cycle_infseq {R : α → α → Prop} (x : α) : R x x → infseq R x := by
   apply infseq.fixpoint_induct R (λ m => R m m)
-  intros
   grind
 
 @[grind] inductive star (R : α → α → Prop) : α → α → Prop where
@@ -53,8 +57,8 @@ inductive plus (R : α → α → Prop) : α → α → Prop where
 theorem plus_one : ∀ a b, R a b → plus R a b := by
   intro a b Rab
   apply plus.plus_left
-  exact Rab
-  apply star.star_refl
+  · exact Rab
+  · grind
 
 @[grind] theorem plus_star : ∀ a b, plus R a b → star R a b := by
     intro a b h
@@ -79,11 +83,8 @@ theorem star_plus_trans:
       grind
     case star_step y a1 a2 =>
       apply plus.plus_left
-      . exact a1
-      . apply star_trans
-        exact a2
-        apply plus_star
-        exact H1
+      · exact a1
+      · grind
 
 theorem plus_right:
   forall a b c, star R a b -> R b c -> plus R a c := by
@@ -103,7 +104,8 @@ def infseq_if_all_seq_inf (R : α → α → Prop) : ∀ x, all_seq_inf R x → 
   constructor
   . exact Rxy
   . intro y' Ryy'
-    apply H y'
+    unfold all_seq_inf at H
+    apply H
     grind
 
 theorem infseq_coinduction_principle_2:
@@ -112,21 +114,8 @@ theorem infseq_coinduction_principle_2:
   ∀ (a : α), x a → infseq R a := by
     intro X
     intro h₁ a rel
-    apply @infseq.fixpoint_induct _ _ (fun a => ∃ b, star R a b ∧ X b)
-    case x =>
-      apply Exists.elim (h₁ a rel)
-      intro a' _
-      exists a'
-      grind
-    case y =>
-      intro a0 h₂
-      apply Exists.elim h₂
-      intro a1 ⟨ h₃ , h₄ ⟩
-      have h₁' := h₁ a1 h₄
-      apply Exists.elim h₁'
-      intro mid ⟨ h₅, h₆⟩
-      have t := plus_star_trans R a0 a1 mid h₃ h₅
-      cases t
-      any_goals grind
+    apply infseq.fixpoint_induct _ (fun a => ∃ b, star R a b ∧ X b)
+    case x => grind
+    case y => grind [cases plus]
 
 @[grind] def irred (R : α → α → Prop) (a : α) : Prop := forall b, ¬(R a b)

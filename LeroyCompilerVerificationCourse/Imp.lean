@@ -1,5 +1,10 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under LGPL 2.1 license as described in the file LICENSE.md.
+Authors: Wojciech Różowski
+-/
+
 import LeroyCompilerVerificationCourse.Sequences
-set_option grind.warning false
 
 def ident := String deriving BEq, Repr, Hashable
 
@@ -18,6 +23,8 @@ def store : Type := ident → Int
   | .PLUS a1 a2 => aeval s a1 + aeval s a2
   | .MINUS a1 a2 => aeval s a1 - aeval s a2
 
+/-- info: 3 -/
+#guard_msgs in
 #eval aeval (λ _ => 2) (.PLUS (.VAR "x") (.MINUS (.VAR "x") (.CONST 1)))
 
 theorem aeval_xplus1 : ∀ s x, aeval s (.PLUS (.VAR x) (.CONST 1)) > aeval s (.VAR x) := by
@@ -75,8 +82,6 @@ inductive com: Type where
   | WHILE (b: bexp) (c1: com)
 
 notation:10 l:10 " ;; " r:11 => com.SEQ l r
-
-#check .SKIP ;; .SKIP
 
 def Euclidean_division :=
   .ASSIGN "r" (.VAR "a") ;;

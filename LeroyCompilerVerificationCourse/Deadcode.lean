@@ -1,10 +1,15 @@
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under LGPL 2.1 license as described in the file LICENSE.md.
+Authors: Wojciech Różowski
+-/
+
 import LeroyCompilerVerificationCourse.Imp
 import Init.Data.List.Basic
 import Std.Data.HashSet
 import Std.Data.HashSet.Lemmas
-set_option grind.warning false
-open Classical in
 
+open Classical in
 @[grind] def IdentSet := Std.HashSet ident
   deriving Membership, Union, EmptyCollection
 
