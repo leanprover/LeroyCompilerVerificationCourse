@@ -1,1 +1,3 @@
 # LeroyCompilerVerificationCourse
+
+This project is a Lean port of Xavier Leroy's [EUTypes 2019 summer school course on "Proving the correctness of a compiler"](https://xavierleroy.org/courses/EUTypes-2019/). The original course material was written in Coq and demonstrates formal verification techniques for compiler correctness using a simple IMP language. This Lean implementation preserves the same theoretical foundations and proof structure while adapting the formalization to Lean's theorem proving system.
