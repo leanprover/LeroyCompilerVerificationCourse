@@ -378,12 +378,12 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
                   any_goals grind
                   case cexec_while_loop s' b' c' s5 s6 EXEC2 EXEC3 EXEC4 _ a_ih2 =>
                     apply a_ih2
-                    . grind
-                    . apply matches_Le
+                    · grind
+                    · apply matches_Le
                       rotate_right
-                      . exact F X
-                      . exact @fixpoint_sound X F S1 (by grind)
-                      . rw [←eq2, ←eq1]
+                      · exact F X
+                      · exact @fixpoint_sound X F S1 (by grind)
+                      · rw [←eq2, ←eq1]
                         simp
                         apply matches_Le
                         apply Le_Join_r
@@ -397,20 +397,20 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
       unfold Cexec
       rw [eq1, eq2]
       apply INNER
-      . apply EXEC
-      . rfl
-      . apply matches_Le
+      · apply EXEC
+      · rfl
+      · apply matches_Le
         have := @fixpoint_sound X F
         apply this
         rotate_left
-        . exact S1
+        · exact S1
         rotate_left
-        . grind
-        . rw [←eq1]
+        · grind
+        · rw [←eq1]
           simp
           apply matches_Le
-          . apply Le_Join_l
-          . exact MATCHES
+          · apply Le_Join_l
+          · exact MATCHES
 
 @[grind] def cp_aexp (S: Store) (a: aexp) : aexp :=
   match a with
@@ -494,36 +494,36 @@ theorem cp_com_correct_terminating:
                     any_goals grind
                     case cexec_while_done isFalse =>
                       apply cexec_mk_WHILE_done
-                      . grind [cp_bexp_sound]
+                      · grind [cp_bexp_sound]
                     case cexec_while_loop s3 b' c' s4 s5 isTrue EXEC2 EXEC3 a_ih a_ih2 =>
                       apply cexec_mk_WHILE_loop
-                      . grind [cp_bexp_sound]
-                      . apply c_ih
-                        . injections heq4 heq5
+                      · grind [cp_bexp_sound]
+                      · apply c_ih
+                        · injections heq4 heq5
                           rw [heq2'] at heq5
                           rw [←heq5] at EXEC2
                           exact EXEC2
-                        . exact AG1
-                      . apply a_ih2
+                        · exact AG1
+                      · apply a_ih2
                         rotate_left
-                        . grind
-                        . apply matches_Le
+                        · grind
+                        · apply matches_Le
                           rw [←heq2]
                           simp [Cexec]
                           apply fixpoint_sound
                           rotate_left
-                          . exact (fun x => Join S1 (Cexec x c))
-                          . exact S1
+                          · exact (fun x => Join S1 (Cexec x c))
+                          · exact S1
                           rotate_left
-                          . grind
-                          . apply matches_Le
-                            . apply Le_Join_r
-                            . apply Cexec_sound
-                              . rw [←heq2']
+                          · grind
+                          · apply matches_Le
+                            · apply Le_Join_r
+                            · apply Cexec_sound
+                              · rw [←heq2']
                                 injections heq3 heq4
                                 rw [heq4]
                                 exact EXEC2
-                              . grind
+                              · grind
       rw [heq1] at EXEC
       induction EXEC
       any_goals grind
@@ -534,12 +534,12 @@ theorem cp_com_correct_terminating:
         rw [←heq3, ←heq4, heq2]
         apply INNER
         any_goals grind
-        . rw [←heq2]
+        · rw [←heq2]
           simp [Cexec]
           apply matches_Le
-          . apply fixpoint_sound
+          · apply fixpoint_sound
             rotate_left
-            . exact (fun x => Join S1 (Cexec x c))
-            . exact S1
-            . grind
-          . grind
+            · exact (fun x => Join S1 (Cexec x c))
+            · exact S1
+            · grind
+          · grind

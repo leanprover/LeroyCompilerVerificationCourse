@@ -381,19 +381,19 @@ theorem dce_correct_terminating:
       have := live_while_charact b c1 L  (live (com.WHILE b c1) L) (by grind)
       have : agree (live c1 (live (com.WHILE b c1) L)) s1 s4 := by
         apply agree_mon
-        . exact hyp
-        . grind
+        · exact hyp
+        · grind
       have ⟨ t1, ht1, ht2⟩ :=  a_ih (live (.WHILE b c1) L) s4 this
       have ⟨u1, hu1, hu2 ⟩ :=  a_ih2 L t1 ht2
       exists u1
       constructor
       rotate_right
-      . exact hu2
-      . apply cexec.cexec_while_loop
-        . have := beval_agree (live (com.WHILE b c1) L) s1 s4 hyp b (by grind)
+      · exact hu2
+      · apply cexec.cexec_while_loop
+        · have := beval_agree (live (com.WHILE b c1) L) s1 s4 hyp b (by grind)
           grind
-        . exact ht1
-        . grind
+        · exact ht1
+        · grind
     case cexec_assign s2 x a=>
       intro L s3 AG
       simp [live] at AG
@@ -401,19 +401,19 @@ theorem dce_correct_terminating:
       case neg notIn =>
         exists s3
         constructor
-        . grind [dce]
-        . simp [notIn] at AG
+        · grind [dce]
+        · simp [notIn] at AG
           exact @agree_update_dead s2 s3 L x (aeval s2 a) (by grind) notIn
       case pos isIn =>
         simp [isIn] at AG
         exists (update x (aeval s3 a) s3)
         constructor
-        . simp [dce, isIn]
+        · simp [dce, isIn]
           grind
-        . have subgoal : aeval s2 a = aeval s3 a := by
+        · have subgoal : aeval s2 a = aeval s3 a := by
             apply aeval_agree
-            . exact AG
-            . intro y mem
+            · exact AG
+            · intro y mem
               grind
           rw [subgoal]
           apply @agree_update_live
@@ -423,8 +423,8 @@ theorem dce_correct_terminating:
       simp [dce]
       have EQ : beval s2 b = beval s4 b := by
         apply beval_agree
-        . apply AG
-        . simp [live]
+        · apply AG
+        · simp [live]
           intro y mem
           grind
       by_cases beval s2 b = true
@@ -436,9 +436,9 @@ theorem dce_correct_terminating:
         have ⟨s5 , EX', AG' ⟩ := ih (by grind)
         exists s5
         constructor
-        . apply cexec.cexec_ifthenelse
+        · apply cexec.cexec_ifthenelse
           grind
-        . exact AG'
+        · exact AG'
       case neg isFalse =>
         simp [isFalse] at EXEC
         specialize ih L s4
@@ -447,16 +447,16 @@ theorem dce_correct_terminating:
         have ⟨s5 , EX', AG' ⟩ := ih (by grind)
         exists s5
         constructor
-        . apply cexec.cexec_ifthenelse
+        · apply cexec.cexec_ifthenelse
           grind
-        . exact AG'
+        · exact AG'
     case cexec_while_done s2 b c isFalse =>
       intro L s1 AG
       have ⟨ h1 , h2 , h3 ⟩ := live_while_charact b c L (live (com.WHILE b c) L) (by grind)
       have EQ : beval s2 b = beval s1 b := by
         apply beval_agree
-        . apply AG
-        . intro y mem
+        · apply AG
+        · intro y mem
           specialize h1 y mem
           exact h1
       exists s1

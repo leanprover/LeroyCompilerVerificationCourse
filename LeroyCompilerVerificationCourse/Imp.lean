@@ -348,15 +348,15 @@ def goes_wrong (c: com) (s: store) : Prop := ∃ c', ∃ s', star red (c, s) (c'
    grind
   case star_step x y _ a₁ a₂ a_ih =>
     apply star.star_step
-    . apply red.red_seq_step
+    · apply red.red_seq_step
       rotate_left
-      . exact y.1
-      . exact y.2
-      . rw [h₁]
+      · exact y.1
+      · exact y.2
+      · rw [h₁]
         exact a₁
-    . apply a_ih
-      . rfl
-      . exact h₂
+    · apply a_ih
+      · rfl
+      · exact h₂
 
 theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s) (.SKIP, s') := by
   intro h
@@ -364,23 +364,23 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
   any_goals grind
   case cexec_seq ih1 ih2  =>
     apply star_trans
-    . apply red_seq_steps
+    · apply red_seq_steps
       exact ih1
-    . apply star.star_step
+    · apply star.star_step
       apply red.red_seq_done
       exact ih2
   case cexec_while_loop ih1 ih2 =>
     apply star_trans
-    . apply star_one
-      . apply red.red_while_loop
-        . grind
-    . apply star_trans
-      . apply red_seq_steps
-        . exact ih1
-      . apply star_trans
+    · apply star_one
+      · apply red.red_while_loop
+        · grind
+    · apply star_trans
+      · apply red_seq_steps
+        · exact ih1
+      · apply star_trans
         rotate_left
-        . apply ih2
-        . grind
+        · apply ih2
+        · grind
 
 @[grind] theorem red_append_cexec (c1 c2 : com) (s1 s2 : store) :
   red (c1, s1) (c2, s2) →
@@ -395,9 +395,9 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
       rw [←heq2.1, ←heq2.2] at heq1
       rw [heq1.1, heq1.2]
       apply cexec.cexec_seq
-      . -- Could be good to have an error about a metavariable in here
+      · -- Could be good to have an error about a metavariable in here
         apply cexec.cexec_skip
-      . exact h2
+      · exact h2
     all_goals grind
 
 theorem reds_to_cexec (s s' : store) (c : com) :
@@ -411,9 +411,9 @@ theorem reds_to_cexec (s s' : store) (c : com) :
       grind
     case star_step r _ a_ih =>
       apply red_append_cexec
-      . rw [←heq1] at r
+      · rw [←heq1] at r
         exact r
-      . apply a_ih
+      · apply a_ih
         all_goals grind
 
 @[grind] inductive cont where

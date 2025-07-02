@@ -102,8 +102,8 @@ def infseq_if_all_seq_inf (R : α → α → Prop) : ∀ x, all_seq_inf R x → 
   intro y Rxy
   exists y
   constructor
-  . exact Rxy
-  . intro y' Ryy'
+  · exact Rxy
+  · intro y' Ryy'
     unfold all_seq_inf at H
     apply H
     grind

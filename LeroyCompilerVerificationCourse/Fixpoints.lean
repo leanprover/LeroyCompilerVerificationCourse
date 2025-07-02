@@ -50,11 +50,11 @@ theorem fixpoint_exists_1 [Monotone α F] : ∃ x : α, eq x (F x) := by
         grind [beq_true']
       case neg isFalse =>
         apply ih (F x)
-        . constructor
-          . exact h
-          . apply beq_false'
+        · constructor
+          · exact h
+          · apply beq_false'
             grind
-        . exact F_mon h
+        · exact F_mon h
   specialize REC
   apply REC
   apply bot_smallest
@@ -81,9 +81,9 @@ instance : WellFoundedRelation α  where
   fun_induction iterate
   case case1 x' PRE SMALL isTrue  =>
     constructor
-    . rw [←heq] at PRE
+    · rw [←heq] at PRE
       grind [beq_true']
-    . intro z hyp
+    · intro z hyp
       specialize SMALL z hyp
       grind
   case case2 ih =>
@@ -103,10 +103,10 @@ theorem fixpoint_correct :
     unfold fixpoint'
     apply iterate_correct
     rotate_left
-    . exact bot
-    . apply bot_smallest
-    . grind [bot_smallest]
-    . rfl
+    · exact bot
+    · apply bot_smallest
+    · grind [bot_smallest]
+    · rfl
 end Fixpoint
 
 section Constprop
@@ -142,11 +142,11 @@ theorem hash_set_incl_size_leq (S1 S2 : Store) : Le S2 S1 → List.Subperm (S1.t
   intro LE
   unfold Le at LE
   apply List.subperm_of_subset
-  . apply List.Pairwise.imp
+  · apply List.Pairwise.imp
     rotate_left
-    . exact distinct_keys_toList
-    . grind
-  . intro (k,v) mem
+    · exact distinct_keys_toList
+    · grind
+  · intro (k,v) mem
     specialize LE k v (by grind)
     grind
 
@@ -220,8 +220,8 @@ instance : Monotone Store (fun x => Join Init (F x)) where
     have ⟨ h1, h2 ⟩:= (Join_characterization Init (F y) z n).1 isSome
     apply (Join_characterization (Init) (F x) z n).2
     constructor
-    . exact h1
-    . apply @F_mon _ _ _ _ _ y le
+    · exact h1
+    · apply @F_mon _ _ _ _ _ y le
       exact h2
 
 noncomputable def fixpoint_join : Store := by
@@ -242,32 +242,32 @@ theorem fixpoint_join_eq: Eq' (Join Init (F (fixpoint_join Init F) )) (fixpoint_
   simp [fixpoint_join] at *
   have := (@iterate_correct Store _ (fun x => Join Init (F x)) _ ?_ ?_ ?_ ?_ ?_ ).1
   unfold Eq'
-  . exact this
-  . exact Init
-  . dsimp
+  · exact this
+  · exact Init
+  · dsimp
     apply Le_Join_l
-  . intro z hyp
+  · intro z hyp
     unfold le instOrderStructStore
     dsimp
     unfold Le
     intro x n hyp2
     specialize hyp x n hyp2
     grind
-  . rw [heq1]
+  · rw [heq1]
 
 theorem fixpoint_join_sound : Le Init (fixpoint_join Init F) /\ Le (F (fixpoint_join Init F)) (fixpoint_join Init F) := by
   have LE : Le (Join Init (F (fixpoint_join Init F))) (fixpoint_join Init F) := by
     apply Eq_Le
     apply fixpoint_join_eq
   constructor
-  . apply Le_trans
+  · apply Le_trans
     rotate_left
-    . exact LE
-    . apply Le_Join_l
-  . apply Le_trans
+    · exact LE
+    · apply Le_Join_l
+  · apply Le_trans
     rotate_left
-    . exact LE
-    . apply Le_Join_r
+    · exact LE
+    · apply Le_Join_r
 
 theorem fixpoint_join_smallest:
   forall S, Le (Join Init (F S)) S -> Le (fixpoint_join Init F) S := by
@@ -276,16 +276,16 @@ theorem fixpoint_join_smallest:
     dsimp
     have := (@iterate_correct Store _ (fun x => Join Init (F x)) _ (fixpoint_join Init F) Init (?_) ?_ ?_).2 S LE
     exact this
-    . dsimp
+    · dsimp
       apply Le_Join_l
-    . intro z hyp
+    · intro z hyp
       unfold le instOrderStructStore
       dsimp
       unfold Le
       intro x n hyp2
       specialize hyp x n hyp2
       grind
-    . unfold fixpoint_join
+    · unfold fixpoint_join
       dsimp
 
 @[grind] theorem Join_increasing:
@@ -330,15 +330,15 @@ theorem fixpoint_join_increasing (_ : Store) (F: Store → Store) (F_mon : ∀ x
   generalize heq : fixpoint_join' S2 F F_mon = fix2
   have : (Le (Join S2 (F fix2)) fix2) := by
     apply Eq_Le
-    . have := @fixpoint_join_eq S2 F (by grind [wrapper])
+    · have := @fixpoint_join_eq S2 F (by grind [wrapper])
       rw [←heq]
       apply this
   apply Le_trans
   rotate_left
-  . apply this
-  . apply Join_increasing
-    . exact hyp
-    . grind
+  · apply this
+  · apply Join_increasing
+    · exact hyp
+    · grind
 
 noncomputable def Cexec' : (c : com) →  {F : Store → Store // ∀ x y, le x y → le (F x) (F y)}
 | .SKIP => ⟨(fun S => S), by grind⟩
@@ -346,7 +346,7 @@ noncomputable def Cexec' : (c : com) →  {F : Store → Store // ∀ x y, le x 
       intro x y hyp
       simp
       apply Update_increasing
-      . exact hyp ⟩
+      · exact hyp ⟩
 | .SEQ c1 c2 =>
   let ⟨ f₁, mon₁ ⟩ := Cexec' c1
   let ⟨ f₂, mon₂ ⟩ := Cexec' c2
@@ -368,13 +368,13 @@ noncomputable def Cexec' : (c : com) →  {F : Store → Store // ∀ x y, le x 
         simp
         apply le_trans
         rotate_right
-        . exact Join (f₁ x) (f₂ x)
+        · exact Join (f₁ x) (f₂ x)
         rotate_left
-        . apply Join_increasing
-          . apply mon₁
-            . exact hyp
-          . apply mon₂
-            . exact hyp
+        · apply Join_increasing
+          · apply mon₁
+            · exact hyp
+          · apply mon₂
+            · exact hyp
         intro id val hyp2
         have := (Join_characterization (f₁ x) (f₂ x) id val).1 hyp2
         split <;> grind
@@ -387,8 +387,8 @@ noncomputable def Cexec' : (c : com) →  {F : Store → Store // ∀ x y, le x 
       simp
       intro x y hyp
       apply fixpoint_join_increasing
-      . exact x
-      . exact hyp ⟩
+      · exact x
+      · exact hyp ⟩
 
 noncomputable def Cexec_Constprop (c : com) : Store → Store := (Cexec' c).val
 instance (c : com) : Monotone Store (Cexec_Constprop c) where
