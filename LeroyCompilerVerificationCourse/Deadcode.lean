@@ -8,8 +8,6 @@ import LeroyCompilerVerificationCourse.Imp
 import Std.Data.HashSet
 
 open Classical in
-
-open Classical in
 @[grind] def IdentSet := Std.HashSet ident
   deriving Membership, Union, EmptyCollection
 
