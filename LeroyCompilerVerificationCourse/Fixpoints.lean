@@ -80,8 +80,6 @@ instance : WellFoundedRelation α  where
   decreasing_by
     grind [beq_false']
 
-#check iterate
-
 @[grind] theorem iterate_correct (x : α) (PRE: le x (F x)) (SMALL: forall z, le (F z) z -> le x z) (heq : y = iterate _ F x PRE SMALL ) : eq y (F y) ∧ ∀ z, le (F z) z → le y z := by
   fun_induction iterate
   case case1 x' PRE SMALL isTrue  =>
