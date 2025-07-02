@@ -5,7 +5,6 @@ Authors: Wojciech Różowski
 -/
 
 import LeroyCompilerVerificationCourse.Sequences
-set_option grind.warning false
 
 def ident := String deriving BEq, Repr, Hashable
 

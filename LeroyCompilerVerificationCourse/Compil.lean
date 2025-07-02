@@ -8,8 +8,6 @@ import LeroyCompilerVerificationCourse.Sequences
 import LeroyCompilerVerificationCourse.Imp
 import Init.Data.List.Basic
 
-set_option grind.warning false
-
 @[grind] inductive instr : Type where
   | Iconst (n: Int)
   | Ivar (x: ident)
@@ -156,30 +154,16 @@ def smart_Ibranch (d: Int) : List instr:=
 
 @[grind =>] theorem instr_a : forall i c2 c1 pc,
   pc = codelen c1 ->
-  instr_at (c1.append (i :: c2) ) pc = .some i := by
+  instr_at (c1 ++ (i :: c2) ) pc = .some i := by
     intro i c2 c1 pc
-    induction c1 generalizing pc
-    case nil =>
-      dsimp [instr_at, codelen]
-      grind
-    case cons h t ih =>
-      dsimp [codelen, instr_at]
-      intro h1
-      split
-      all_goals grind [List.append_eq]
+    induction c1 generalizing pc with grind
 
 @[grind] theorem instr_at_app:
   ∀ i c2 c1 pc,
   pc = codelen c1 ->
-  instr_at (c1.append (i :: c2)) pc = .some i := by
+  instr_at (c1 ++ (i :: c2)) pc = .some i := by
     intro i c2 c1 pc pc_eq
-    induction c1 generalizing pc
-    case nil =>
-      dsimp [instr_at]
-      dsimp [codelen] at pc_eq
-      grind
-    case cons h t t_ih =>
-      grind [instr_at, codelen, List.append_eq]
+    induction c1 generalizing pc with grind
 
 theorem code_at_head :
   forall C pc i C',
@@ -191,15 +175,7 @@ theorem code_at_head :
     induction H
     case code_at_intro c1 c2 c3 oc a =>
       unfold instr_at
-      rw [←heq1]
-      induction c1 generalizing oc
-      case nil =>
-        grind
-      case cons h t t_ih =>
-        have _ : oc ≠ 0 := by grind
-        have _ : t ++ i :: (C' ++ c3) ≠ [] := by grind
-        dsimp
-        grind
+      induction c1 generalizing oc with grind
 
 @[grind] theorem code_at_tail :
    forall C pc i C',
@@ -240,7 +216,7 @@ theorem code_at_head :
     cases h
     case code_at_intro b e a =>
       have := code_at.code_at_intro (b ++ c1) c2 (c3 ++ e) (pc + codelen c1) (by grind)
-      grind [List.append_assoc]
+      grind
 
 @[grind] theorem code_at_nil : forall C pc C1,
   code_at C pc C1 -> code_at C pc [] := by
@@ -264,9 +240,7 @@ theorem code_at_head :
         specialize t_ih (pc - 1) i h
         cases t_ih
         next c1 c3 a =>
-          simp
-          have := code_at.code_at_intro (f :: c1) [] c3 pc
-          grind
+          grind [← code_at.code_at_intro]
       next z =>
         have := code_at.code_at_intro [] [] (f :: t) pc
         grind [List.nil_append]
@@ -311,7 +285,7 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
           cases a
           next c1 c3 a =>
             have h1 := instr_a instr.Iadd c3 (c1 ++ compile_aexp a1 ++ compile_aexp a2) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) (by grind)
-            have h2 := @transition.trans_add ((c1 ++ compile_aexp a1 ++ compile_aexp a2).append (instr.Iadd :: c3)) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) stk s (aeval s a1) (aeval s a2) (by grind)
+            have h2 := @transition.trans_add ((c1 ++ compile_aexp a1 ++ compile_aexp a2) ++ (instr.Iadd :: c3)) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) stk s (aeval s a1) (aeval s a2) (by grind)
             simp [codelen_app, codelen_cons, codelen] at *
             grind
     next a1 a2 a1_ih a2_ih =>
@@ -923,8 +897,7 @@ theorem simulation_steps:
         . exact match3
 
 theorem instr_at_len : instr_at (C ++ [i]) (codelen C) = .some i := by
-  induction C
-  any_goals grind
+  induction C with grind
 
 theorem match_initial_configs:
   forall c s,
