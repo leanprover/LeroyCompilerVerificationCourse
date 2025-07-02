@@ -1,6 +1,5 @@
 import LeroyCompilerVerificationCourse.Imp
 import LeroyCompilerVerificationCourse.Constprop
-import Std.Data.HashMap
 import Batteries.Data.List.Perm
 
 universe u
