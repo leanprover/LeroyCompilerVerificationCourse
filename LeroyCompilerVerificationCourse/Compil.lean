@@ -721,7 +721,7 @@ theorem simulation_step:
               simp [isFalse] at *
               rw [h₅]
               have := @code_at_app_right C pc (codeb ++ code1 ++ [instr.Ibranch (codelen code2)]) code2 (by grind [List.append_assoc, List.cons_append, List.nil_append])
-              simp [codelen_cons, codelen_singleton, codelen_app] at this
+              simp [codelen_cons, codelen_app] at this
               simp [codelen] at *
               grind
           . by_cases beval st b = true

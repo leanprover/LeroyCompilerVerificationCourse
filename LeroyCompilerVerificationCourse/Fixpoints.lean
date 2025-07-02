@@ -365,7 +365,7 @@ noncomputable def Cexec' : (c : com) →  {F : Store → Store // ∀ x y, le x 
       generalize heq : Beval y b = h
       cases h
       case none =>
-        simp [heq]
+        simp
         apply le_trans
         rotate_right
         . exact Join (f₁ x) (f₂ x)
