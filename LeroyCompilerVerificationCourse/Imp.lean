@@ -108,8 +108,7 @@ def Euclidean_division :=
       cexec s (.WHILE b c) s''
 
 attribute [grind] cexec.cexec_skip
-grind_pattern cexec.cexec_seq => cexec s c1 s', cexec s (.SEQ c1 c2) s''
-grind_pattern cexec.cexec_seq => cexec s' c2 s'', cexec s (.SEQ c1 c2) s''
+attribute [grind <=] cexec.cexec_seq
 
 theorem cexec_infinite_loop (s : store) : ¬ ∃ s', cexec s (.WHILE .TRUE .SKIP) s' := by
   rintro ⟨s', h₂⟩
