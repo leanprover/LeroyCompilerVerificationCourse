@@ -6,7 +6,7 @@ Authors: Wojciech Różowski
 
 def infseq {α} (R : α → α → Prop) : α → Prop :=
   λ x : α => ∃ y, R x y ∧ infseq R y
-  greatest_fixpoint
+  coinductive_fixpoint
 
 -- Application of the rewrite rule
 def infseq_fixpoint {α} (R : α → α → Prop) (x : α) :
@@ -14,20 +14,20 @@ def infseq_fixpoint {α} (R : α → α → Prop) (x : α) :
   rw [infseq]
 
 -- The associated coinduction principle
-theorem infseq.coind {α} (h : α → Prop) (R : α → α → Prop)
+theorem infseq_coinduction_principle {α} (h : α → Prop) (R : α → α → Prop)
     (prem : ∀ (x : α), h x → ∃ y, R x y ∧ h y) : ∀ x, h x → infseq R x := by
-  apply infseq.fixpoint_induct
+  apply infseq.coinduct
   grind
 
 /--
-info: infseq.fixpoint_induct.{u_1} {α : Sort u_1} (R : α → α → Prop) (x : α → Prop)
-  (y : ∀ (x_1 : α), x x_1 → ∃ y, R x_1 y ∧ x y) (x✝ : α) : x x✝ → infseq R x✝
+info: infseq.coinduct.{u_1} {α : Sort u_1} (R : α → α → Prop) (x : α → Prop) (y : ∀ (x_1 : α), x x_1 → ∃ y, R x_1 y ∧ x y)
+  (x✝ : α) : x x✝ → infseq R x✝
 -/
-#guard_msgs in #check infseq.fixpoint_induct
+#guard_msgs in #check infseq.coinduct
 
 -- Simple proof by coinduction
 theorem cycle_infseq {R : α → α → Prop} (x : α) : R x x → infseq R x := by
-  apply infseq.fixpoint_induct R (λ m => R m m)
+  apply infseq.coinduct R (λ m => R m m)
   grind
 
 @[grind] inductive star (R : α → α → Prop) : α → α → Prop where
@@ -75,8 +75,8 @@ theorem plus_one : ∀ a b, R a b → plus R a b := by
     exact rel
     grind
 
-theorem star_plus_trans:
-  forall a b c, star R a b -> plus R b c -> plus R a c := by
+theorem star_plus_trans :
+  ∀ a b c, star R a b -> plus R b c -> plus R a c := by
     intro a b c H0 H1
     cases H0
     case star_refl =>
@@ -86,8 +86,8 @@ theorem star_plus_trans:
       · exact a1
       · grind
 
-theorem plus_right:
-  forall a b c, star R a b -> R b c -> plus R a c := by
+theorem plus_right :
+  ∀ a b c, star R a b -> R b c -> plus R a c := by
   intro a b c h₁ h₂
   grind [star_plus_trans, plus_one]
 
@@ -95,27 +95,75 @@ theorem plus_right:
 def all_seq_inf (R : α → α → Prop) (x : α) : Prop :=
   ∀ y : α, star R x y → ∃ z, R y z
 
+def infseq_with_function (R : α → α → Prop) (a: α) : Prop :=
+  ∃ f : Nat → α, f 0 = a ∧ ∀ i, R (f i) (f (1 + i))
+
 def infseq_if_all_seq_inf (R : α → α → Prop) : ∀ x, all_seq_inf R x → infseq R x := by
-  apply infseq.fixpoint_induct
+  apply infseq.coinduct
   intro x H
   apply Exists.elim (H x (by simp only [star.star_refl]))
   intro y Rxy
   exists y
   constructor
-  . exact Rxy
-  . intro y' Ryy'
+  · exact Rxy
+  · intro y' Ryy'
     unfold all_seq_inf at H
     apply H
     grind
 
-theorem infseq_coinduction_principle_2:
+theorem infseq_coinduction_principle_2 :
   ∀ (x : α → Prop),
   (∀ (a : α), x a → ∃ b, plus R a b ∧ x b) →
   ∀ (a : α), x a → infseq R a := by
     intro X
     intro h₁ a rel
-    apply infseq.fixpoint_induct _ (fun a => ∃ b, star R a b ∧ X b)
+    apply infseq.coinduct _ (fun a => ∃ b, star R a b ∧ X b)
     case x => grind
     case y => grind [cases plus]
 
-@[grind] def irred (R : α → α → Prop) (a : α) : Prop := forall b, ¬(R a b)
+theorem infseq_from_function : ∀ a, infseq_with_function R a → infseq R a := by
+  apply infseq.coinduct
+  intro x hyp
+  unfold infseq_with_function at hyp
+  have ⟨f , ⟨h0, hsucc⟩⟩ := hyp
+  refine ⟨f 1, ?_⟩
+  refine ⟨by grind, ?_⟩
+  unfold infseq_with_function
+  refine ⟨fun n => f (n + 1), ?_⟩
+  refine ⟨by grind, ?_⟩
+  intro i
+  specialize hsucc (i + 1)
+  grind
+
+@[grind] def irred (R : α → α → Prop) (a : α) : Prop := ∀ b, ¬(R a b)
+
+theorem star_star_inv (R_functional : ∀ a b c, R a b -> R a c -> b = c) : ∀ a b, star R a b -> forall c, star R a c → star R b c ∨ star R c b := by
+  intro _ _ sab
+  induction sab <;> grind
+
+theorem finseq_unique (R_functional : ∀ a b c, R a b -> R a c -> b = c) :
+  ∀ a b b', star R a b → irred R b → star R a b' → irred R b' → b = b' := by
+    intro a b b' sab ib sab' ib'
+    apply Or.elim (star_star_inv R_functional a b sab b' sab') <;> grind
+
+@[grind ]theorem infseq_star_inv (R_functional : ∀ a b c, R a b -> R a c -> b = c) : ∀ a b, star R a b → infseq R a → infseq R b := by
+  intro a b sab ia
+  induction sab
+  case star_refl => grind
+  case star_step x y z rxy syz ih =>
+    unfold infseq at ia
+    grind
+
+theorem infseq_finseq_excl (R_functional : ∀ a b c, R a b -> R a c -> b = c): ∀ a b, star R a b → irred R b → infseq R a → False := by
+  intro a b sab irb ia
+  have h : infseq R b := by grind
+  unfold infseq at h
+  grind
+
+theorem infseq_all_seq_inf (R_functional : ∀ a b c, R a b -> R a c -> b = c): ∀ a, infseq R a → all_seq_inf R a := by
+  intro a ia
+  unfold all_seq_inf
+  intro b sab
+  have h : infseq R b := by grind
+  unfold infseq at h
+  grind

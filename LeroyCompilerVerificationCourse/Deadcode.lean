@@ -4,11 +4,8 @@ Released under LGPL 2.1 license as described in the file LICENSE.md.
 Authors: Wojciech Różowski
 -/
 
-import LeroyCompilerVerificationCourse.Sequences
 import LeroyCompilerVerificationCourse.Imp
-import Init.Data.List.Basic
 import Std.Data.HashSet
-import Std.Data.HashSet.Lemmas
 
 open Classical in
 @[grind] def IdentSet := Std.HashSet ident
@@ -19,7 +16,7 @@ open Classical in
 
 @[grind] noncomputable instance (a b : IdentSet) : Decidable (a ⊆ b) := Classical.propDecidable (a ⊆ b)
 
-@[grind] instance (x : ident) (a: IdentSet) : Decidable (x ∈ a) := Std.HashSet.instDecidableMem
+@[grind] instance (x : ident) (a : IdentSet) : Decidable (x ∈ a) := Std.HashSet.instDecidableMem
 
 @[grind] instance : EmptyCollection IdentSet where
   emptyCollection := Std.HashSet.emptyWithCapacity
@@ -37,14 +34,14 @@ open Classical in
 @[grind] theorem insert_characterisation (a : IdentSet) (x : ident) : x ∈ a.insert x := by
   grind [Std.HashSet.contains_insert]
 
-@[grind] def fv_aexp (a: aexp) : IdentSet :=
+@[grind] def fv_aexp (a : aexp) : IdentSet :=
   match a with
   | .CONST _ => ∅
   | .VAR v => Std.HashSet.instSingleton.singleton v
   | .PLUS a1 a2 =>  (fv_aexp a1) ∪ (fv_aexp a2)
   | .MINUS a1 a2 => (fv_aexp a1) ∪ (fv_aexp a2)
 
-@[grind] def fv_bexp (b: bexp) : IdentSet :=
+@[grind] def fv_bexp (b : bexp) : IdentSet :=
   match b with
   | .TRUE => ∅
   | .FALSE => ∅
@@ -53,7 +50,7 @@ open Classical in
   | .NOT b1 => fv_bexp b1
   | .AND b1 b2 => (fv_bexp b1) ∪ (fv_bexp b2)
 
-@[grind] def fv_com (c: com) : IdentSet :=
+@[grind] def fv_com (c : com) : IdentSet :=
   match c with
   | .SKIP => ∅
   | .ASSIGN _ a => fv_aexp a
@@ -61,24 +58,24 @@ open Classical in
   | .IFTHENELSE b c1 c2 => (fv_bexp b) ∪ ((fv_com c1) ∪ (fv_com c2))
   | .WHILE b c => (fv_bexp b) ∪ (fv_com c)
 
-@[grind] noncomputable def deadcode_fixpoint_rec (F : IdentSet → IdentSet) (default : IdentSet) (fuel: Nat) (x: IdentSet) : IdentSet :=
+@[grind] noncomputable def deadcode_fixpoint_rec (F : IdentSet → IdentSet) (default : IdentSet) (fuel : Nat) (x : IdentSet) : IdentSet :=
   match fuel with
   | 0 => default
   | fuel + 1 =>
       let x' := F x
       if x' ⊆ x then x else deadcode_fixpoint_rec F default fuel x'
 
-@[grind] noncomputable def deadcode_fixpoint (F : IdentSet → IdentSet) (default : IdentSet): IdentSet :=
+@[grind] noncomputable def deadcode_fixpoint (F : IdentSet → IdentSet) (default : IdentSet) : IdentSet :=
   deadcode_fixpoint_rec F default 20 ∅
 
-@[grind] theorem  fixpoint_charact' (n : Nat) (x : IdentSet)  (F : IdentSet → IdentSet) (default : IdentSet):
+@[grind] theorem  fixpoint_charact' (n : Nat) (x : IdentSet)  (F : IdentSet → IdentSet) (default : IdentSet) :
   ((F (deadcode_fixpoint_rec F default n x)) ⊆ (deadcode_fixpoint_rec F default n x)) ∨ (deadcode_fixpoint_rec F default n x = default) := by
     induction n generalizing x <;> grind
 
 theorem fixpoint_charact (F : IdentSet → IdentSet) (default : IdentSet) :
     ((F (deadcode_fixpoint F default)) ⊆ (deadcode_fixpoint F default)) ∨ (deadcode_fixpoint F default = default) := by grind
 
-theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F_stable : ∀ x , x ⊆ default -> (F x) ⊆ default): deadcode_fixpoint F default ⊆ default := by
+theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F_stable : ∀ x , x ⊆ default -> (F x) ⊆ default) : deadcode_fixpoint F default ⊆ default := by
   have : ∀ n : Nat, ∀ x : IdentSet, x ⊆ default → (deadcode_fixpoint_rec F default n x) ⊆ default := by
     intro n
     induction n
@@ -95,7 +92,7 @@ theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F
   unfold instHasSubsetIdentSet
   grind
 
-@[grind] noncomputable def live (c: com) (L: IdentSet) : IdentSet :=
+@[grind] noncomputable def live (c : com) (L : IdentSet) : IdentSet :=
   match c with
   | .SKIP => L
   | .ASSIGN x a =>
@@ -111,8 +108,8 @@ theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F
       let default := (fv_com (.WHILE b c)) ∪ L
       deadcode_fixpoint (fun x => L' ∪ (live c x)) default
 
-theorem live_upper_bound:
-  forall c L,
+theorem live_upper_bound :
+  ∀ c L,
    (live c L) ⊆ ((fv_com c) ∪  L) := by
     intro c
     induction c
@@ -212,7 +209,7 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
           have := live_upper_bound c L' y mem
           grind
 
-@[grind] noncomputable def dce (c: com) (L: IdentSet): com :=
+@[grind] noncomputable def dce (c : com) (L : IdentSet) : com :=
   match c with
   | .SKIP => .SKIP
   | .ASSIGN x a => if x ∈ L then .ASSIGN x a else .SKIP
@@ -220,11 +217,11 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
   | .IFTHENELSE b c1 c2 => .IFTHENELSE b (dce c1 L) (dce c2 L)
   | .WHILE b c => .WHILE b (dce c (live (.WHILE b c) L))
 
-@[grind] def agree (L: IdentSet) (s1 s2: store) : Prop :=
-  forall x, x  ∈ L -> s1 x = s2 x
+@[grind] def agree (L : IdentSet) (s1 s2 : store) : Prop :=
+  ∀ x, x  ∈ L -> s1 x = s2 x
 
-@[grind] theorem agree_mon:
-  forall L L' s1 s2,
+@[grind] theorem agree_mon :
+  ∀ L L' s1 s2,
   agree L' s1 s2 -> L ⊆ L' -> agree L s1 s2 := by
     intro L L' s1 s2 AG sub
     unfold agree at *
@@ -233,9 +230,9 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
     specialize AG x sub
     exact AG
 
-@[grind] theorem aeval_agree:
-  forall L s1 s2, agree L s1 s2 ->
-  forall a, (fv_aexp a) ⊆ L -> aeval s1 a = aeval s2 a := by
+@[grind] theorem aeval_agree :
+  ∀ L s1 s2, agree L s1 s2 ->
+  ∀ a, (fv_aexp a) ⊆ L -> aeval s1 a = aeval s2 a := by
     intro L s1 s2 AG a
     induction a
     any_goals grind
@@ -283,9 +280,9 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
         specialize contained y (by grind)
         exact contained
 
-theorem beval_agree:
+theorem beval_agree :
   ∀ L s1 s2, agree L s1 s2 ->
-  forall b, (fv_bexp b) ⊆ L -> beval s1 b = beval s2 b := by
+  ∀ b, (fv_bexp b) ⊆ L -> beval s1 b = beval s2 b := by
     intro L s1 s2 AG b
     induction b
     any_goals grind
@@ -338,8 +335,8 @@ theorem beval_agree:
       specialize b2_ih (by grind)
       grind
 
-theorem agree_update_live:
-  forall s1 s2 L x v,
+theorem agree_update_live :
+  ∀ s1 s2 L x v,
   agree (L.erase x) s1 s2 ->
   agree L (update x v s1) (update x v s2) := by
     intro s1 s2 L x v AG
@@ -354,8 +351,8 @@ theorem agree_update_live:
     case pos isEq =>
       grind
 
-theorem agree_update_dead:
-  forall s1 s2 L x v,
+theorem agree_update_dead :
+  ∀ s1 s2 L x v,
   agree L s1 s2 -> ¬x ∈ L ->
   agree L (update x v s1) s2 := by
     intro s1 s2 L x v AG not
@@ -365,10 +362,10 @@ theorem agree_update_dead:
     simp [update]
     by_cases x=y <;> grind
 
-theorem dce_correct_terminating:
-  forall s c s', cexec s c s' ->
-  forall L s1, agree (live c L) s s1 ->
-  exists s1', cexec s1 (dce c L) s1' /\ agree L s' s1' := by
+theorem dce_correct_terminating :
+  ∀ s c s', cexec s c s' ->
+  ∀ L s1, agree (live c L) s s1 ->
+  ∃ s1', cexec s1 (dce c L) s1' /\ agree L s' s1' := by
     intro s c s' EXEC
     induction EXEC
     any_goals grind
@@ -377,19 +374,19 @@ theorem dce_correct_terminating:
       have := live_while_charact b c1 L  (live (com.WHILE b c1) L) (by grind)
       have : agree (live c1 (live (com.WHILE b c1) L)) s1 s4 := by
         apply agree_mon
-        . exact hyp
-        . grind
+        · exact hyp
+        · grind
       have ⟨ t1, ht1, ht2⟩ :=  a_ih (live (.WHILE b c1) L) s4 this
       have ⟨u1, hu1, hu2 ⟩ :=  a_ih2 L t1 ht2
       exists u1
       constructor
       rotate_right
-      . exact hu2
-      . apply cexec.cexec_while_loop
-        . have := beval_agree (live (com.WHILE b c1) L) s1 s4 hyp b (by grind)
+      · exact hu2
+      · apply cexec.cexec_while_loop
+        · have := beval_agree (live (com.WHILE b c1) L) s1 s4 hyp b (by grind)
           grind
-        . exact ht1
-        . grind
+        · exact ht1
+        · grind
     case cexec_assign s2 x a=>
       intro L s3 AG
       simp [live] at AG
@@ -397,19 +394,19 @@ theorem dce_correct_terminating:
       case neg notIn =>
         exists s3
         constructor
-        . grind [dce]
-        . simp [notIn] at AG
+        · grind [dce]
+        · simp [notIn] at AG
           exact @agree_update_dead s2 s3 L x (aeval s2 a) (by grind) notIn
       case pos isIn =>
         simp [isIn] at AG
         exists (update x (aeval s3 a) s3)
         constructor
-        . simp [dce, isIn]
+        · simp [dce, isIn]
           grind
-        . have subgoal : aeval s2 a = aeval s3 a := by
+        · have subgoal : aeval s2 a = aeval s3 a := by
             apply aeval_agree
-            . exact AG
-            . intro y mem
+            · exact AG
+            · intro y mem
               grind
           rw [subgoal]
           apply @agree_update_live
@@ -419,8 +416,8 @@ theorem dce_correct_terminating:
       simp [dce]
       have EQ : beval s2 b = beval s4 b := by
         apply beval_agree
-        . apply AG
-        . simp [live]
+        · apply AG
+        · simp [live]
           intro y mem
           grind
       by_cases beval s2 b = true
@@ -432,9 +429,9 @@ theorem dce_correct_terminating:
         have ⟨s5 , EX', AG' ⟩ := ih (by grind)
         exists s5
         constructor
-        . apply cexec.cexec_ifthenelse
+        · apply cexec.cexec_ifthenelse
           grind
-        . exact AG'
+        · exact AG'
       case neg isFalse =>
         simp [isFalse] at EXEC
         specialize ih L s4
@@ -443,16 +440,16 @@ theorem dce_correct_terminating:
         have ⟨s5 , EX', AG' ⟩ := ih (by grind)
         exists s5
         constructor
-        . apply cexec.cexec_ifthenelse
+        · apply cexec.cexec_ifthenelse
           grind
-        . exact AG'
+        · exact AG'
     case cexec_while_done s2 b c isFalse =>
       intro L s1 AG
       have ⟨ h1 , h2 , h3 ⟩ := live_while_charact b c L (live (com.WHILE b c) L) (by grind)
       have EQ : beval s2 b = beval s1 b := by
         apply beval_agree
-        . apply AG
-        . intro y mem
+        · apply AG
+        · intro y mem
           specialize h1 y mem
           exact h1
       exists s1
