@@ -1,19 +1,24 @@
-set_option grind.warning false
+/-
+Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
+Released under LGPL 2.1 license as described in the file LICENSE.md.
+Authors: Wojciech Różowski
+-/
 
 def infseq {α} (R : α → α → Prop) : α → Prop :=
   λ x : α => ∃ y, R x y ∧ infseq R y
- greatest_fixpoint
+  greatest_fixpoint
 
 -- Application of the rewrite rule
 def infseq_fixpoint {α} (R : α → α → Prop) (x : α) :
-  infseq R x = ∃ y, R x y ∧ infseq R y := by
-    rw [infseq]
+    infseq R x = ∃ y, R x y ∧ infseq R y := by
+  rw [infseq]
 
 -- The associated coinduction principle
 theorem infseq.coind {α} (h : α → Prop) (R : α → α → Prop)
-  (prem : ∀ (x : α), h x → ∃ y, R x y ∧ h y) : ∀ x, h x → infseq R x := by
+    (prem : ∀ (x : α), h x → ∃ y, R x y ∧ h y) : ∀ x, h x → infseq R x := by
   apply infseq.fixpoint_induct
-  exact prem
+  grind
+
 /--
 info: infseq.fixpoint_induct.{u_1} {α : Sort u_1} (R : α → α → Prop) (x : α → Prop)
   (y : ∀ (x_1 : α), x x_1 → ∃ y, R x_1 y ∧ x y) (x✝ : α) : x x✝ → infseq R x✝
@@ -23,7 +28,6 @@ info: infseq.fixpoint_induct.{u_1} {α : Sort u_1} (R : α → α → Prop) (x :
 -- Simple proof by coinduction
 theorem cycle_infseq {R : α → α → Prop} (x : α) : R x x → infseq R x := by
   apply infseq.fixpoint_induct R (λ m => R m m)
-  intros
   grind
 
 @[grind] inductive star (R : α → α → Prop) : α → α → Prop where
