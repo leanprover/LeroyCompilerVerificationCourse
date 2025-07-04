@@ -86,12 +86,7 @@ theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F
       unfold instHasSubsetIdentSet
       grind
     case succ n ih =>
-      unfold deadcode_fixpoint_rec
-      simp
-      intro x hyp
-      split
-      case isTrue => grind
-      case isFalse => grind
+      grind
   apply this
   unfold Subset
   unfold instHasSubsetIdentSet
@@ -159,7 +154,6 @@ theorem live_upper_bound :
       have : y ∈ fv_bexp b ∨ y ∈ L ∨ y ∈ live c1 x := by grind
       apply Or.elim this
       next =>
-        intro hyp3
         grind
       next =>
         intro hyp3
@@ -171,7 +165,7 @@ theorem live_upper_bound :
           specialize c1_ih x y hyp3
           have : y ∈ fv_com c1 ∨ y ∈ x := by grind
           apply Or.elim this
-          next => intros; grind
+          next => grind
           next =>
             intro hyp4
             specialize hyp y hyp4
@@ -187,18 +181,17 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
       constructor
       case left =>
         intro y contained
-        specialize included y (by grind)
+        specialize included y
         grind
       case right =>
         constructor
         case left =>
           intro y mem
-          specialize included y (by grind)
+          specialize included y
           grind
         case right =>
           intro y mem
-          rw [eq]
-          specialize included y (by grind)
+          specialize included y
           grind
     case right =>
       intro equal

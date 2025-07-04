@@ -30,19 +30,16 @@ def store : Type := ident → Int
 theorem aeval_xplus1 : ∀ s x, aeval s (.PLUS (.VAR x) (.CONST 1)) > aeval s (.VAR x) := by
   grind
 
-
 @[grind] def free_in_aexp (x : ident) (a : aexp) : Prop :=
   match a with
   | .CONST _ => False
   | .VAR y => y = x
-  | .PLUS a1 a2 | .MINUS a1 a2 => free_in_aexp x a1 ∨ free_in_aexp x a2
+  | .PLUS a1 a2
+  | .MINUS a1 a2 => free_in_aexp x a1 ∨ free_in_aexp x a2
 
-theorem aeval_free :
-  ∀ s1 s2 a,
-  (∀ x, free_in_aexp x a → s1 x = s2 x) →
-  aeval s1 a = aeval s2 a := by
-    intro s1 _ a _
-    fun_induction aeval s1 a with grind
+theorem aeval_free (s1 s2 a) (h : ∀ x, free_in_aexp x a → s1 x = s2 x) :
+    aeval s1 a = aeval s2 a := by
+  fun_induction aeval s1 a with grind
 
 inductive bexp : Type where
   | TRUE
@@ -71,8 +68,7 @@ def LESS (a1 a2 : aexp) : bexp := GREATER a2 a1
   | .NOT b1 =>  !(beval s b1)
   | .AND b1 b2 => beval s b1 && beval s b2
 
-theorem beval_OR :
-  ∀ s b1 b2, beval s (OR b1 b2) = beval s b1 ∨ beval s b2 := by grind
+theorem beval_OR : beval s (OR b1 b2) = beval s b1 ∨ beval s b2 := by grind
 
 inductive com : Type where
   | SKIP
@@ -111,14 +107,13 @@ def Euclidean_division :=
       beval s b = true -> cexec s c s' -> cexec s' (.WHILE b c) s'' ->
       cexec s (.WHILE b c) s''
 
-theorem cexec_infinite_loop :
-  ∀ s, ¬ ∃ s', cexec s (.WHILE .TRUE .SKIP) s' := by
-  intro _ h
-  apply Exists.elim h
-  intro s'
-  generalize heq : (com.WHILE .TRUE .SKIP) = c
-  intro h₂
-  induction h₂ <;> grind
+attribute [grind] cexec.cexec_skip
+attribute [grind <=] cexec.cexec_seq
+
+theorem cexec_infinite_loop (s : store) : ¬ ∃ s', cexec s (.WHILE .TRUE .SKIP) s' := by
+  rintro ⟨s', h₂⟩
+  generalize heq : com.WHILE .TRUE .SKIP = c at h₂
+  induction h₂ with grind
 
 @[grind] def cexec_bounded (fuel : Nat) (s : store) (c : com) : Option store :=
   match fuel with
@@ -141,16 +136,9 @@ theorem cexec_infinite_loop :
       else
         .some s
 
-theorem cexec_bounded_sound : ∀ fuel s c s',
-    cexec_bounded fuel s c = .some s'
-  → cexec s c s' := by
-  intro fuel
-  induction fuel
-  case succ fuel ih =>
-    intros _ c
-    cases c
-    all_goals grind
-  all_goals grind
+theorem cexec_bounded_sound {fuel s c s'} :
+    cexec_bounded fuel s c = .some s' → cexec s c s' := by
+  induction fuel generalizing s c s' with grind [cases com]
 
 theorem cexec_bounded_complete (s s' : store) (c : com) :
   cexec s c s' →
@@ -160,13 +148,11 @@ theorem cexec_bounded_complete (s s' : store) (c : com) :
     case cexec_skip =>
       exists 1
       intro fuel' fgt
-      induction fgt
-      all_goals grind
+      induction fgt with grind
     case cexec_assign =>
       exists 1
       intro fuel' fgt
-      induction fgt
-      any_goals grind
+      induction fgt with grind
     case cexec_seq a_ih1 a_ih2 =>
       apply Exists.elim a_ih1
       intro fuel1 a_ih1
@@ -174,7 +160,7 @@ theorem cexec_bounded_complete (s s' : store) (c : com) :
       intro fuel2 a_ih2
       exists (fuel1 + fuel2)
       intro fuel' fgt
-      have t : fuel' ≥ fuel1 ∧  fuel' ≥ fuel2 := by grind
+      have t : fuel' ≥ fuel1 ∧ fuel' ≥ fuel2 := by grind
       have t1 : fuel1 > 0 := by
         false_or_by_contra
         rename_i hyp
@@ -187,40 +173,18 @@ theorem cexec_bounded_complete (s s' : store) (c : com) :
         simp at hyp
         specialize a_ih2 0 (by grind)
         grind
-      induction fuel'
-      case zero => grind
-      case succ m ih  =>
-        specialize a_ih1 m (by grind)
-        simp only [cexec_bounded, a_ih1]
-        specialize a_ih2 m (by grind)
-        exact a_ih2
+      induction fuel' with grind
     case cexec_ifthenelse s b c1 c2 s' a a_ih =>
       apply Exists.elim a_ih
       intro fuel
       intro a_ih
       exists (fuel + 1)
-      intro bigger_fuel
-      intro gt
       unfold cexec_bounded
-      have gt' : bigger_fuel > 0 := by grind
-      split
-      case h_1 => grind
-      case h_2 f =>
-        simp
-        split
-        case isTrue w =>
-          specialize a_ih f (by grind)
-          simp [w] at a_ih
-          exact a_ih
-        case isFalse w =>
-          specialize a_ih f (by grind)
-          simp [w] at a_ih
-          exact a_ih
+      grind
     case cexec_while_done =>
       exists 1
       intro fuel fgt
-      induction fgt
-      all_goals grind
+      induction fgt with grind
     case cexec_while_loop a_ih1 a_ih2 =>
       apply Exists.elim a_ih1
       intro fuel1 a_ih1
@@ -230,21 +194,14 @@ theorem cexec_bounded_complete (s s' : store) (c : com) :
       intro fuel' fgt
       have t1 : fuel1 > 0 := by
         false_or_by_contra
-        rename_i hyp
         specialize a_ih1 0 (by grind)
-        dsimp [cexec_bounded] at a_ih1
-        contradiction
+        grind
       have t2 : fuel2 > 0 := by
         false_or_by_contra
-        rename_i hyp
         specialize a_ih2 0 (by grind)
-        dsimp [cexec_bounded] at a_ih2
-        contradiction
-      induction fgt
-      any_goals grind
-      case refl =>
-        unfold cexec_bounded
         grind
+      unfold cexec_bounded
+      induction fgt with grind
 
 @[grind] inductive red : com × store → com × store → Prop where
   | red_assign : ∀ x a s,
@@ -272,7 +229,7 @@ theorem red_progress :
       intro s
       apply Or.intro_right
       exists com.SKIP
-      exists (update identifier (aeval s expression) s)
+      exists update identifier (aeval s expression) s
       grind
     case SEQ c1 c2 c1_ih c2_ih =>
       intro s
@@ -280,7 +237,6 @@ theorem red_progress :
       apply Or.elim (c1_ih s)
       case h.left =>
         intro c1_eq
-        rw [c1_eq]
         exists c2
         exists s
         grind
@@ -290,7 +246,7 @@ theorem red_progress :
         intro c1' h
         apply Exists.elim h
         intro s' h
-        exists (.SEQ c1' c2)
+        exists .SEQ c1' c2
         exists s'
         grind
     case IFTHENELSE b c1 c2 c1_ih c2_ih =>
@@ -340,23 +296,20 @@ def goes_wrong (c : com) (s : store) : Prop := ∃ c', ∃ s', star red (c, s) (
 
 @[grind] theorem red_seq_steps (c2 c c' : com) (s s' : store) : star red (c, s) (c', s') → star red ((c;;c2), s) ((c';;c2), s') := by
   intro H
-  generalize h₁ : (c,s) = v₁
-  generalize h₂ : (c',s') = v₂
+  generalize h₁ : (c, s) = v₁
+  generalize h₂ : (c', s') = v₂
   rw [h₁, h₂] at H
   induction H generalizing c s
   case star_refl =>
-   grind
+    grind
   case star_step x y _ a₁ a₂ a_ih =>
     apply star.star_step
     · apply red.red_seq_step
       rotate_left
       · exact y.1
       · exact y.2
-      · rw [h₁]
-        exact a₁
-    · apply a_ih
-      · rfl
-      · exact h₂
+      · grind
+    · grind
 
 theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s) (.SKIP, s') := by
   intro h
@@ -382,39 +335,17 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
         · apply ih2
         · grind
 
-@[grind] theorem red_append_cexec (c1 c2 : com) (s1 s2 : store) :
-  red (c1, s1) (c2, s2) →
-  ∀ s', cexec s2 c2 s' → cexec s1 c1 s' := by
-    intro h s h2
-    generalize heq1 : (c1, s1) = h1
-    generalize heq2 : (c2, s2) = h2
-    rw [heq1, heq2] at h
-    induction h generalizing c1 c2 s
-    case red_seq_done =>
-      simp only [Prod.mk.injEq] at heq1 heq2
-      rw [←heq2.1, ←heq2.2] at heq1
-      rw [heq1.1, heq1.2]
-      apply cexec.cexec_seq
-      · -- Could be good to have an error about a metavariable in here
-        apply cexec.cexec_skip
-      · exact h2
-    all_goals grind
+@[grind] theorem red_append_cexec (c1 c2 : com) (s1 s2 : store) (h : red (c1, s1) (c2, s2)) (h₂ : cexec s2 c2 s) :
+    cexec s1 c1 s := by
+  generalize heq1 : (c1, s1) = h1 at h
+  generalize heq2 : (c2, s2) = h2 at h
+  induction h generalizing c1 c2 s with grind
 
-theorem reds_to_cexec (s s' : store) (c : com) :
-  star red (c, s) (.SKIP, s') → cexec s c s' := by
-    intro h
-    generalize heq1 : (c, s) = h1
-    generalize heq2 : (com.SKIP, s') = h2
-    rw [heq1, heq2] at h
-    induction h generalizing s c s'
-    case star_refl =>
-      grind
-    case star_step r _ a_ih =>
-      apply red_append_cexec
-      · rw [←heq1] at r
-        exact r
-      · apply a_ih
-        all_goals grind
+theorem reds_to_cexec (s s' : store) (c : com) (h : star red (c, s) (.SKIP, s')) :
+    cexec s c s' := by
+  generalize heq1 : (c, s) = h1 at h
+  generalize heq2 : (com.SKIP, s') = h2 at h
+  induction h generalizing s c s' with grind
 
 @[grind] inductive cont where
 | Kstop

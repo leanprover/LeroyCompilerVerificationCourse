@@ -631,14 +631,6 @@ theorem compile_cont_Kwhile_inv (C : List instr) (b : bexp) (c : com) (k : cont)
           · exact rfl
           · grind
       · grind
-    case ccont_while b' c' k' pc₂ d pc₃ pc₄ h₃ h₄ h₅ h₆ h₇ ih =>
-      exists (pc + 1 + d)
-      constructor
-      apply plus_one
-      apply transition.trans_branch
-      rotate_left 2
-      · exact d
-      any_goals grind
 
 theorem match_config_skip (C : List instr) (k : cont) (s : store) (pc : Int) (H : compile_cont C k pc) :
  match_config C (.SKIP, k, s) (pc, [], s) := by
