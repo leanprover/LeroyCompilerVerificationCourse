@@ -171,7 +171,6 @@ theorem code_at_head :
     rw [heq1] at H
     induction H
     case code_at_intro c1 c2 c3 oc a =>
-      unfold instr_at
       induction c1 generalizing oc with grind
 
 @[grind] theorem code_at_tail :
@@ -227,14 +226,8 @@ theorem code_at_head :
     induction C generalizing pc i
     case nil => grind
     case cons f t t_ih =>
-      unfold instr_at at h
-      by_cases pc = 0
-      rotate_left
-      next nz =>
-        grind
-      next z =>
-        have := code_at.code_at_intro [] [] (f :: t) pc
-        grind
+      have := code_at.code_at_intro [] [] (f :: t) pc
+      grind
 
 @[grind] theorem code_at_to_instr_at : code_at C pc (c1 ++ i :: c2) → instr_at C (pc + codelen c1) = .some i := by
   grind

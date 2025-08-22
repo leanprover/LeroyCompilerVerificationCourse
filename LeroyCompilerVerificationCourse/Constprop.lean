@@ -444,8 +444,7 @@ theorem cp_bexp_sound :
   ∀ s S, matches' s S ->
   ∀ b, beval s (cp_bexp S b) = beval s b := by
     intro s S AG b
-    induction b
-    any_goals grind [mk_EQUAL_sound, mk_LESSEQUAL_sound, mk_AND_sound, mk_NOT_sound]
+    induction b with grind [mk_EQUAL_sound, mk_LESSEQUAL_sound, mk_AND_sound, mk_NOT_sound]
 
 @[grind] noncomputable def cp_com (S : Store) (c : com) : com :=
   match c with
@@ -469,7 +468,6 @@ theorem cp_com_correct_terminating :
     case ASSIGN x a =>
       cases EXEC
       next =>
-        simp [cp_com]
         have := @cexec.cexec_assign s1 x (cp_aexp S1 a)
         grind
     case IFTHENELSE b c1 c2 c1_ih c2_ih =>
