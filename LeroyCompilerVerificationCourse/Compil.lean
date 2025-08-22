@@ -237,31 +237,19 @@ theorem code_at_head :
         grind
 
 @[grind] theorem code_at_to_instr_at : code_at C pc (c1 ++ i :: c2) → instr_at C (pc + codelen c1) = .some i := by
-    intro h
-    cases h
-    next b e a =>
-      have := instr_at_app i (c2 ++ e) (b ++ c1) (pc + codelen c1) (by simp [codelen]; grind)
-      grind [List.append_eq]
+  grind
 
 theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) (stk : stack) :
   code_at C pc (compile_aexp a) →
   transitions C (pc, stk, s) (pc + codelen (compile_aexp a), aeval s a :: stk, s) := by
     induction a generalizing C pc stk
     next =>
-      simp [aeval, compile_aexp]
-      intro a
       unfold transitions
-      apply star_one
-      apply transition.trans_const
-      cases a
-      next => grind
+      grind
     next =>
-      simp [aeval, compile_aexp]
       intro a
       apply star_one
-      apply transition.trans_var
-      cases a
-      next => grind
+      grind
     next a1 a2 a1_ih a2_ih =>
       simp [aeval, compile_aexp]
       intro a
@@ -269,14 +257,13 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
       · apply a1_ih
         grind
       · apply star_trans
-        · specialize a2_ih C (pc + codelen (compile_aexp a1)) (aeval s a1 :: stk)
-          apply a2_ih
+        · apply a2_ih
           grind
         · apply star_one
           cases a
           next c1 c3 a =>
-            have h1 := instr_a instr.Iadd c3 (c1 ++ compile_aexp a1 ++ compile_aexp a2) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) (by grind)
-            have h2 := @transition.trans_add ((c1 ++ compile_aexp a1 ++ compile_aexp a2) ++ (instr.Iadd :: c3)) (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) stk s (aeval s a1) (aeval s a2) (by grind)
+            have h1 := instr_a
+            have h2 := @transition.trans_add
             grind
     next a1 a2 a1_ih a2_ih =>
       simp [aeval, compile_aexp]
@@ -285,17 +272,15 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
       · apply a1_ih
         grind
       · apply star_trans
-        · specialize a2_ih C (pc + codelen (compile_aexp a1)) (aeval s a1 :: stk)
-          apply a2_ih
+        · apply a2_ih
           grind
         · apply star_trans
           · apply star_one
-            · have := @transition.trans_opp C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2)) ((aeval s a1) :: stk) s (aeval s a2)
-              apply this
+            · apply transition.trans_opp
               grind
           · apply star_one
-            · have := @code_at_to_instr_at C pc (compile_aexp a1 ++ compile_aexp a2 ++ [instr.Iopp])  instr.Iadd [] (by grind)
-              have := @transition.trans_add C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2) + 1) stk s (aeval s a1) (-aeval s a2) (by simp [codelen] at *; grind)
+            · have := @code_at_to_instr_at C pc (compile_aexp a1 ++ compile_aexp a2 ++ [instr.Iopp])
+              have := @transition.trans_add
               grind
 -- Miss 5
 theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : Int) (pc : Int) (stk : stack) (h : code_at C pc (compile_bexp b d1 d0))  :
@@ -311,12 +296,7 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
         apply star.star_refl
       case neg is_not_zero =>
         apply star_one
-        simp [is_not_zero, codelen]
-        apply transition.trans_branch _ _ _ d1
-        · simp [compile_bexp, is_not_zero] at h
-          have := @code_at_to_instr_at C pc [] (instr.Ibranch d1) [] (by grind)
-          grind
-        · grind
+        grind
     next =>
       simp [compile_bexp, beval]
       by_cases d0 = 0
@@ -326,51 +306,27 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
       case neg is_not_zero =>
         apply star_one
         simp [is_not_zero, codelen]
-        apply transition.trans_branch _ _ _ d0
-        · simp [compile_bexp, is_not_zero] at h
-          have := @code_at_to_instr_at C pc [] (instr.Ibranch d0) [] (by grind)
+        grind
+    next a1 a2 =>
+      simp [compile_bexp, beval]
+      apply star_trans
+      · apply compile_aexp_correct (a := a1)
+        grind
+      · apply star_trans
+        · apply compile_aexp_correct (a := a2)
           grind
-        · grind
+        · apply star_one
+          · apply transition.trans_beq (d1 := d1) (d0 := d0) <;> grind
     next a1 a2 =>
       simp [compile_bexp, beval]
       apply star_trans
-      · apply compile_aexp_correct
-        rotate_left
-        · exact a1
-        · grind
+      · apply compile_aexp_correct (a := a1)
+        grind
       · apply star_trans
-        · apply compile_aexp_correct
-          rotate_right
-          · exact a2
-          · grind
+        · apply compile_aexp_correct (a := a2)
+          grind
         · apply star_one
-          · apply transition.trans_beq
-            rotate_left; rotate_left
-            · exact d1
-            · exact d0
-            · simp [compile_bexp] at h
-              grind
-            · grind
-    next a1 a2 =>
-      simp [compile_bexp, beval]
-      apply star_trans
-      · apply compile_aexp_correct
-        rotate_left
-        · exact a1
-        · grind
-      · apply star_trans
-        · apply compile_aexp_correct
-          rotate_right
-          · exact a2
-          · grind
-        · apply star_one
-          · apply transition.trans_ble
-            rotate_left; rotate_left
-            · exact d1
-            · exact d0
-            · simp [compile_bexp] at h
-              grind
-            · grind
+          · apply transition.trans_ble (d1 := d1) (d0 := d0) <;> grind
     next b1 ih =>
       grind
     next b1 b2 b1_ih b2_ih =>
@@ -379,11 +335,8 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
       unfold compile_bexp
       simp [heq1, heq2]
       apply star_trans
-      · apply b1_ih
-        rotate_left
-        · exact 0
-        · exact (codelen code2 + d0)
-        · grind
+      · apply b1_ih (d1 := 0) (d0 := codelen code2 + d0)
+        grind
       · by_cases beval s b1 = true
         case pos isTrue =>
           simp [isTrue]
@@ -397,9 +350,6 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
           simp [Int.add_assoc] at *
           exact b2_ih
         case neg isFalse =>
-          simp [beval, isFalse]
-          rw [heq2]
-          simp [codelen_app]
           grind
 
 theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s c s') :
@@ -418,24 +368,16 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
     intro C pc stk h
     unfold compile_com
     apply star_trans
-    · apply compile_aexp_correct
-      rotate_left
-      · exact a
-      · unfold compile_com at h
-        grind
+    · apply compile_aexp_correct (a := a)
+      grind
     · apply star_one
-      · have := @transition.trans_setvar C (pc + codelen (compile_aexp a)) stk s x (aeval s a)
-        rw [codelen_app, codelen_singleton]
-        suffices transition C (pc + codelen (compile_aexp a), aeval s a :: stk, s) (pc + codelen (compile_aexp a) + 1, stk, update x (aeval s a) s) from by grind
-        apply this
+      · have := @transition.trans_setvar C
         grind
   case cexec_seq s'2 c1 s1 c2 s2 cexec1 cexec2 c1_ih c2_ih =>
     intro C pc stk h
     apply star_trans
     · apply c1_ih
-      unfold compile_com at h
-      apply code_at_app_left
-      exact h
+      grind
     · specialize c2_ih C (pc + codelen (compile_com c1)) stk
       simp [compile_com, codelen_app]
       simp [Int.add_assoc] at c2_ih
@@ -459,11 +401,7 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
         · apply ih
           grind
         · apply star_one
-          · apply transition.trans_branch
-            rotate_right
-            · exact codelen code2
-            · grind
-            · grind
+          · apply transition.trans_branch (d := codelen code2) <;> grind
       case neg isFalse =>
         simp [isFalse]
         rw [heq3]
@@ -499,17 +437,13 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
     apply star_trans
     · apply compile_bexp_correct C s b 0 (codelen code_body + 1) pc stk (by grind)
     · apply star_trans
-      · simp [isTrue]
-        rw [heq2]
-        specialize ih1 C (pc + codelen code_branch) stk
-        apply ih1
+      · apply ih1
         grind
       · apply star_trans
         · apply star_one
-          apply transition.trans_branch
+          apply transition.trans_branch (d := d)
           rotate_left
           rotate_left
-          · exact d
           · exact (pc + codelen code_branch + codelen code_body + 1 + d)
           · grind
           · grind
@@ -520,7 +454,6 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
             rw [heq1, heq2, heq3] at ih2
             simp [codelen_app]
             simp [codelen_app] at ih2
-
             have : (pc + codelen code_branch + codelen code_body + 1 + d +
       (codelen code_branch + (codelen code_body + codelen [instr.Ibranch d])) ) = (pc + (codelen code_branch + (codelen code_body + codelen [instr.Ibranch d]))) := by grind
             rw [←this]
