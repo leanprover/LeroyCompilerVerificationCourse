@@ -15,8 +15,8 @@ universe u
   le : α → α → Prop
   beq : α → α → Bool
   le_trans : ∀ x y z, le x y -> le y z -> le x z
-  beq_true' : ∀ x y : α, beq x y = true → eq x y
-  beq_false' : ∀ x y : α, beq x y = false → ¬ eq x y
+  beq_true' : ∀ x y : α, beq x y = true → eq x y := by grind
+  beq_false' : ∀ x y : α, beq x y = false → ¬ eq x y := by grind
   gt_wf : WellFounded (fun x y : α => le y x ∧ ¬eq y x)
 open OrderStruct
 
@@ -171,14 +171,8 @@ theorem hash_set_incl_size_leq (S1 S2 : Store) : Le S2 S1 → List.Subperm (S1.t
   ∀ S S', Gt S S' -> S.size < S'.size := by
     intro S S' hyp
     unfold Gt at hyp
-    have ⟨ t₁, t₂ ⟩ := @Le_cardinal S S' (hyp.1)
-    apply Nat.lt_of_le_of_ne
-    case h₁ => exact t₁
-    case h₂ =>
-      apply Classical.byContradiction
-      intro h
-      simp at h
-      grind
+    have ⟨t₁, t₂⟩ := @Le_cardinal S S' (hyp.1)
+    grind
 
 theorem Gt_wf : WellFounded Gt := by
   have := @InvImage Store Nat Nat.lt fun x => x.size
@@ -200,8 +194,6 @@ noncomputable instance : OrderStruct Store where
   le := Le
   beq (S1 S2 : Store) :=  Decidable.decide (Equal S1 S2)
   le_trans := Le_trans
-  beq_true' := by grind
-  beq_false' := by grind
   gt_wf := Gt_wf
 end Constprop
 
@@ -225,15 +217,9 @@ instance : Monotone Store (fun x => Join Init (F x)) where
       exact h2
 
 noncomputable def fixpoint_join : Store := by
-  have := iterate Store (fun x => Join Init (F x)) Init (by apply Le_Join_l)
-  apply this
-  dsimp
-  intro z hyp
-  unfold le instOrderStructStore
-  dsimp
-  unfold Le
-  intro x n hyp2
-  specialize hyp x n hyp2
+  apply iterate Store (fun x => Join Init (F x)) Init (by apply Le_Join_l)
+  intro z hyp x
+  specialize hyp x
   grind
 
 theorem fixpoint_join_eq : Eq' (Join Init (F (fixpoint_join Init F) )) (fixpoint_join Init F) := by
@@ -244,14 +230,9 @@ theorem fixpoint_join_eq : Eq' (Join Init (F (fixpoint_join Init F) )) (fixpoint
   unfold Eq'
   · exact this
   · exact Init
-  · dsimp
-    apply Le_Join_l
-  · intro z hyp
-    unfold le instOrderStructStore
-    dsimp
-    unfold Le
-    intro x n hyp2
-    specialize hyp x n hyp2
+  · apply Le_Join_l
+  · intro z hyp x
+    specialize hyp x
     grind
   · rw [heq1]
 
@@ -273,31 +254,23 @@ theorem fixpoint_join_smallest :
   ∀ S, Le (Join Init (F S)) S -> Le (fixpoint_join Init F) S := by
     intro S LE
     unfold fixpoint_join
-    dsimp
     have := (@iterate_correct Store _ (fun x => Join Init (F x)) _ (fixpoint_join Init F) Init (?_) ?_ ?_).2 S LE
     exact this
-    · dsimp
-      apply Le_Join_l
-    · intro z hyp
-      unfold le instOrderStructStore
-      dsimp
-      unfold Le
-      intro x n hyp2
-      specialize hyp x n hyp2
+    · apply Le_Join_l
+    · intro z hyp x
+      specialize hyp x
       grind
     · unfold fixpoint_join
       dsimp
 
 @[grind] theorem Join_increasing :
   ∀ S1 S2 S3 S4,
-  Le S1 S2 -> Le S3 S4 -> Le (Join S1 S3) (Join S2 S4) := by
-    intros
-    grind
+  Le S1 S2 -> Le S3 S4 -> Le (Join S1 S3) (Join S2 S4) := by grind
 
 @[grind] theorem Aeval_increasing : ∀ S1 S2, Le S1 S2 ->
   ∀ a n, Aeval S2 a = .some n -> Aeval S1 a =.some n := by
     intro S1 S2 LE a
-    induction a <;> grind
+    induction a with grind
 
 @[grind] theorem Beval_increasing : ∀ S1 S2, Le S1 S2 ->
   ∀ b n, Beval S2 b = .some n -> Beval S1 b = .some n := by
@@ -312,8 +285,7 @@ theorem fixpoint_join_smallest :
 theorem Update_increasing :
   ∀ S1 S2 x a,
   Le S1 S2 ->
-  Le (Update x (Aeval S1 a) S1) (Update x (Aeval S2 a) S2) := by
-    intros; grind
+  Le (Update x (Aeval S1 a) S1) (Update x (Aeval S2 a) S2) := by grind
 
 end FixpointJoin
 
@@ -375,9 +347,8 @@ noncomputable def Cexec' : (c : com) →  {F : Store → Store // ∀ x y, le x 
             · exact hyp
           · apply mon₂
             · exact hyp
-        intro id val hyp2
-        have := (Join_characterization (f₁ x) (f₂ x) id val).1 hyp2
-        split <;> grind
+        intro id
+        grind
       case some val =>
         have := Beval_increasing x y hyp b val heq
         split <;> grind ⟩

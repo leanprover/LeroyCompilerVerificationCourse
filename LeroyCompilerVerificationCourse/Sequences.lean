@@ -108,8 +108,7 @@ theorem infseq_from_function : ∀ a, infseq_with_function R a → infseq R a :=
   intro x hyp
   unfold infseq_with_function at hyp
   have ⟨f , ⟨h0, hsucc⟩⟩ := hyp
-  refine ⟨f 1, ?_⟩
-  refine ⟨by grind, ?_⟩
+  refine ⟨f 1, by grind, ?_⟩
   unfold infseq_with_function
   refine ⟨fun n => f (n + 1), by grind⟩
 
@@ -117,7 +116,7 @@ theorem infseq_from_function : ∀ a, infseq_with_function R a → infseq R a :=
 
 theorem star_star_inv (R_functional : ∀ a b c, R a b -> R a c -> b = c) (sab : star R a b) :
     ∀ c, star R a c → star R b c ∨ star R c b := by
-  induction sab <;> grind
+  induction sab with grind
 
 theorem finseq_unique (R_functional : ∀ a b c, R a b -> R a c -> b = c) :
   ∀ a b b', star R a b → irred R b → star R a b' → irred R b' → b = b' := by

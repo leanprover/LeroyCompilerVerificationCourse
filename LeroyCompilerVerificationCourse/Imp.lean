@@ -252,18 +252,11 @@ theorem cexec_bounded_complete (s s' : store) (c : com) :
       intro fuel2 a_ih2
       exists (fuel1 + fuel2)
       intro fuel' fgt
-      have t : fuel' ≥ fuel1 ∧ fuel' ≥ fuel2 := by grind
       have t1 : fuel1 > 0 := by
-        false_or_by_contra
-        rename_i hyp
-        simp at hyp
-        specialize a_ih1 0 (by grind)
+        specialize a_ih1 0
         grind
       have t2 : fuel2 > 0 := by
-        false_or_by_contra
-        rename_i hyp
-        simp at hyp
-        specialize a_ih2 0 (by grind)
+        specialize a_ih2 0
         grind
       induction fuel' with grind
     case cexec_ifthenelse s b c1 c2 s' a a_ih =>
@@ -282,17 +275,15 @@ theorem cexec_bounded_complete (s s' : store) (c : com) :
       intro fuel1 a_ih1
       apply Exists.elim a_ih2
       intro fuel2 a_ih2
-      exists (fuel1 + fuel2)
-      intro fuel' fgt
       have t1 : fuel1 > 0 := by
-        false_or_by_contra
-        specialize a_ih1 0 (by grind)
+        specialize a_ih1 0
         grind
       have t2 : fuel2 > 0 := by
-        false_or_by_contra
-        specialize a_ih2 0 (by grind)
+        specialize a_ih2 0
         grind
+      exists (fuel1 + fuel2)
       unfold cexec_bounded
+      intro fuel' fgt
       induction fgt with grind
 
 /-
@@ -332,11 +323,7 @@ theorem red_progress :
       intro s
       apply Or.intro_right
       apply Or.elim (c1_ih s)
-      case h.left =>
-        intro c1_eq
-        exists c2
-        exists s
-        grind
+      case h.left => grind
       case h.right =>
         intro h
         apply Exists.elim h
@@ -362,11 +349,8 @@ def goes_wrong (c : com) (s : store) : Prop := ∃ c', ∃ s', star red (c, s) (
     grind
   case star_step x y _ a₁ a₂ a_ih =>
     apply star.star_step
-    · apply red.red_seq_step
-      rotate_left
-      · exact y.1
-      · exact y.2
-      · grind
+    · apply red.red_seq_step (c2 := y.1)  (s2 := y.2)
+      grind
     · grind
 
 /-
@@ -386,7 +370,7 @@ theorem cexec_to_reds (s s' : store) (c : com) : cexec s c s' → star red (c, s
       exact ih1
     · apply star.star_step
       apply red.red_seq_done
-      exact ih2
+      grind
   case cexec_while_loop ih1 ih2 =>
     apply star_trans
     · apply star_one
