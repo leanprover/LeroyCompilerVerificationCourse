@@ -155,7 +155,7 @@ theorem hash_set_incl_size_leq (S1 S2 : Store) : Le S2 S1 → List.Subperm (S1.t
   Le T S ->
   S.size <= T.size ∧ (S.size = T.size → Equal S T) := by
     intro S T hyp
-    have size_eq : ∀ (S : Store), S.size = S.toList.length := by grind [length_toList]
+    have size_eq : ∀ (S : Store), S.size = S.toList.length := by grind
     rw [size_eq S, size_eq T]
     constructor
     case left =>

@@ -412,7 +412,7 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
           · apply Le_Join_l
           · exact MATCHES
 
-@[grind] def cp_aexp (S : Store) (a : aexp) : aexp :=
+@[grind =] def cp_aexp (S : Store) (a : aexp) : aexp :=
   match a with
   | .CONST n => .CONST n
   | .VAR x => match S.get? x with
@@ -435,7 +435,10 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
   ∀ s S, matches' s S ->
   ∀ a, aeval s (cp_aexp S a) = aeval s a := by
     intro s S AG a
-    induction a <;> grind [mk_PLUS_sound, mk_MINUS_sound]
+    induction a
+    all_goals try grind
+    -- Unfortunately this grind call explodes on one of the goals since v4.23.0-rc2
+    all_goals grind [mk_PLUS_sound, mk_MINUS_sound]
 
 theorem cp_bexp_sound :
   ∀ s S, matches' s S ->

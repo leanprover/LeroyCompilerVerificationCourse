@@ -32,7 +32,7 @@ open Classical in
 
 
 @[grind] theorem insert_characterisation (a : IdentSet) (x : ident) : x ∈ a.insert x := by
-  grind [Std.HashSet.contains_insert]
+  grind
 
 @[grind] def fv_aexp (a : aexp) : IdentSet :=
   match a with

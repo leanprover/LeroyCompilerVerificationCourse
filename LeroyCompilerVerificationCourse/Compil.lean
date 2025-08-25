@@ -133,18 +133,18 @@ def compile_program (p : com) : List instr :=
 def smart_Ibranch (d : Int) : List instr :=
   if d = 0 then [] else .Ibranch d :: []
 
-@[grind] inductive code_at : List instr -> Int -> List instr-> Prop where
+@[grind] inductive code_at : List instr → Int → List instr → Prop where
   | code_at_intro : ∀ C1 C2 C3 pc,
       pc = codelen C1 ->
       code_at (C1 ++ C2 ++ C3) pc C2
 
-@[grind] theorem codelen_cons :
+@[grind =] theorem codelen_cons :
   ∀ i c, codelen (i :: c) = codelen c + 1 := by grind
 
-@[grind] theorem codelen_singleton : codelen [i] = 1 := by
+@[grind =] theorem codelen_singleton : codelen [i] = 1 := by
   dsimp [codelen]
 
-@[grind] theorem codelen_app :
+@[grind =] theorem codelen_app :
   ∀ c1 c2, codelen (c1 ++ c2) = codelen c1 + codelen c2 := by
     intro c1 _
     induction c1 with grind
@@ -192,7 +192,7 @@ theorem code_at_head :
     cases h
     case code_at_intro c1 c3 a =>
       have := code_at.code_at_intro c1 m1 (m2 ++ c3) pc a
-      grind [List.append_assoc]
+      grind
 
 @[grind] theorem code_at_app_right :
   ∀ C pc C1 C2,
@@ -202,7 +202,7 @@ theorem code_at_head :
     cases h
     case code_at_intro b e a =>
       have := code_at.code_at_intro (b ++ c1) c2 e (pc + codelen c1) (by grind)
-      grind [List.append_assoc]
+      grind
 
 @[grind] theorem code_at_app_right2 : ∀ C pc C1 C2 C3,
   code_at C pc (C1 ++ C2 ++ C3) →
@@ -219,7 +219,7 @@ theorem code_at_head :
     cases h
     case code_at_intro b e a =>
       have := code_at.code_at_intro b [] (c1 ++ e) pc a
-      grind [List.append_nil, List.append_assoc]
+      grind
 
 @[grind] theorem instr_at_code_at_nil :
   ∀ C pc i, instr_at C pc = .some i -> code_at C pc [] := by
@@ -231,21 +231,17 @@ theorem code_at_head :
       by_cases pc = 0
       rotate_left
       next nz =>
-        simp [nz] at h
-        specialize t_ih (pc - 1) i h
-        cases t_ih
-        next c1 c3 a =>
-          grind [← code_at.code_at_intro]
+        grind
       next z =>
         have := code_at.code_at_intro [] [] (f :: t) pc
-        grind [List.nil_append]
+        grind
 
 @[grind] theorem code_at_to_instr_at : code_at C pc (c1 ++ i :: c2) → instr_at C (pc + codelen c1) = .some i := by
     intro h
     cases h
     next b e a =>
       have := instr_at_app i (c2 ++ e) (b ++ c1) (pc + codelen c1) (by simp [codelen]; grind)
-      grind [List.append_assoc, List.append_eq]
+      grind [List.append_eq]
 
 theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) (stk : stack) :
   code_at C pc (compile_aexp a) →
@@ -298,7 +294,7 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
               apply this
               grind
           · apply star_one
-            · have := @code_at_to_instr_at C pc (compile_aexp a1 ++ compile_aexp a2 ++ [instr.Iopp])  instr.Iadd [] (by grind [List.append_assoc, List.cons_append, List.nil_append])
+            · have := @code_at_to_instr_at C pc (compile_aexp a1 ++ compile_aexp a2 ++ [instr.Iopp])  instr.Iadd [] (by grind)
               have := @transition.trans_add C (pc + codelen (compile_aexp a1) + codelen (compile_aexp a2) + 1) stk s (aeval s a1) (-aeval s a2) (by simp [codelen] at *; grind)
               grind
 -- Miss 5
@@ -318,7 +314,7 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
         simp [is_not_zero, codelen]
         apply transition.trans_branch _ _ _ d1
         · simp [compile_bexp, is_not_zero] at h
-          have := @code_at_to_instr_at C pc [] (instr.Ibranch d1) [] (by grind [List.append_assoc, List.nil_append])
+          have := @code_at_to_instr_at C pc [] (instr.Ibranch d1) [] (by grind)
           grind
         · grind
     next =>
@@ -332,7 +328,7 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
         simp [is_not_zero, codelen]
         apply transition.trans_branch _ _ _ d0
         · simp [compile_bexp, is_not_zero] at h
-          have := @code_at_to_instr_at C pc [] (instr.Ibranch d0) [] (by grind [List.append_assoc, List.nil_append])
+          have := @code_at_to_instr_at C pc [] (instr.Ibranch d0) [] (by grind)
           grind
         · grind
     next a1 a2 =>
@@ -712,7 +708,7 @@ theorem simulation_step :
             case neg isFalse =>
               simp [isFalse] at *
               rw [h₅]
-              have := @code_at_app_right C pc (codeb ++ code1 ++ [instr.Ibranch (codelen code2)]) code2 (by grind [List.append_assoc, List.cons_append, List.nil_append])
+              have := @code_at_app_right C pc (codeb ++ code1 ++ [instr.Ibranch (codelen code2)]) code2 (by grind)
               simp [codelen_cons, codelen_app] at this
               simp [codelen] at *
               grind
@@ -851,7 +847,7 @@ theorem match_initial_configs :
     constructor
     · simp [compile_program]
       have := code_at.code_at_intro [] C [instr.Ihalt] 0 (by simp [codelen])
-      grind [List.nil_append]
+      grind
     · simp [compile_program, heq]
       constructor
       grind

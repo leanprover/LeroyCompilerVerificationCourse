@@ -20,8 +20,8 @@ theorem infseq_coinduction_principle {α} (h : α → Prop) (R : α → α → P
   grind
 
 /--
-info: infseq.coinduct.{u_1} {α : Sort u_1} (R : α → α → Prop) (x : α → Prop) (y : ∀ (x_1 : α), x x_1 → ∃ y, R x_1 y ∧ x y)
-  (x✝ : α) : x x✝ → infseq R x✝
+info: infseq.coinduct.{u_1} {α : Sort u_1} (R : α → α → Prop) (pred : α → Prop)
+  (hyp : ∀ (x : α), pred x → ∃ y, R x y ∧ pred y) (x✝ : α) : pred x✝ → infseq R x✝
 -/
 #guard_msgs in #check infseq.coinduct
 

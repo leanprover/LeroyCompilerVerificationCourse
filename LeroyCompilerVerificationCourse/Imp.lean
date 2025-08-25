@@ -328,12 +328,6 @@ theorem red_progress :
     intro c
     induction c
     any_goals grind
-    case ASSIGN identifier expression =>
-      intro s
-      apply Or.intro_right
-      exists com.SKIP
-      exists update identifier (aeval s expression) s
-      grind
     case SEQ c1 c2 c1_ih c2_ih =>
       intro s
       apply Or.intro_right
@@ -351,48 +345,6 @@ theorem red_progress :
         intro s' h
         exists .SEQ c1' c2
         exists s'
-        grind
-    case IFTHENELSE b c1 c2 c1_ih c2_ih =>
-      intro s
-      apply Or.intro_right
-      have h : beval s b = true ∨ beval s b = false := by grind
-      apply Or.elim h
-      case h.left =>
-        intro is_true
-        apply Or.elim (c1_ih s)
-        case left =>
-          intro c1_skip
-          exists .SKIP
-          exists s
-          grind
-        case right => grind
-      case h.right =>
-        intro is_false
-        apply Or.elim (c2_ih s)
-        case left =>
-          intro c2_skip
-          exists .SKIP
-          exists s
-          grind
-        case right => grind
-    case WHILE b c ih =>
-      intro s
-      apply Or.intro_right
-      have h : beval s b = true ∨ beval s b = false := by grind
-      apply Or.elim h
-      case left =>
-        intro _
-        apply Or.elim (ih s)
-        any_goals grind
-        case left =>
-          intro _
-          exists (.SEQ .SKIP  (.WHILE b c))
-          exists s
-          grind
-      case right =>
-        intros
-        exists .SKIP
-        exists s
         grind
 
 def goes_wrong (c : com) (s : store) : Prop := ∃ c', ∃ s', star red (c, s) (c', s') ∧ irred red (c', s') ∧ c' ≠ .SKIP
