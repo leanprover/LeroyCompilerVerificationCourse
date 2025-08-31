@@ -3,32 +3,74 @@ Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
 Released under LGPL 2.1 license as described in the file LICENSE.md.
 Authors: Wojciech Różowski
 -/
-
 import LeroyCompilerVerificationCourse.Imp
 
+/-
+  2. The target language: a stack machine
+
+  Our compiler will translate IMP to the language of a simple stack
+  machine.  This machine is similar to the "Reverse Polish Notation"
+  used by old HP pocket calculators: a stack holds intermediate
+  results, and individual instructions pop arguments off the stack and
+  push results back on the stack.
+-/
+
+/-
+  2.1 Instruction set
+
+  Here is the instruction set of the machine:
+-/
 @[grind] inductive instr : Type where
-  | Iconst (n : Int)
-  | Ivar (x : ident)
-  | Isetvar (x : ident)
-  | Iadd
-  | Iopp
-  | Ibranch (d : Int)
-  | Ibeq (d1 : Int) (d0 : Int)
-  | Ible (d1 : Int) (d0 : Int)
-  | Ihalt
+  | Iconst (n : Int)            /-r push the integer `n` -/
+  | Ivar (x : ident)            /-r push the current value of variable `x` -/
+  | Isetvar (x : ident)         /-r pop an integer and assign it to variable `x` -/
+  | Iadd                        /-r pop two integers, push their sum -/
+  | Iopp                        /-r pop one integer, push its opposite -/
+  | Ibranch (d : Int)           /-r skip forward or backward `d` instructions -/
+  | Ibeq (d1 : Int) (d0 : Int)  /-r pop two integers, skip `d1` instructions if equal, `d0` if not equal -/
+  | Ible (d1 : Int) (d0 : Int)  /-r pop two integer, skip `d1` instructions if less or equal, `d0` if greater -/
+  | Ihalt                       /-r stop execution -/
     deriving Repr
 
+/-
+  A piece of machine code is a list of instructions.
+-/
+
+/-
+  The length (number of instructions) of a piece of code.
+-/
 @[grind] def codelen (c : List instr) : Int := c.length
+
+/-
+  2.2 Operational semantics
+
+  The machine operates on a code `C` (a fixed list of instructions)
+  and three variable components:
+  - a program counter `pc`, denoting a position in `C`
+  - an evaluation stack, containing integers
+  - a store assigning integer values to variables.
+-/
 
 def stack : Type := List Int
 
 def config : Type := Int × stack × store
 
+/-
+  `instr_at C pc = .some i` if `i` is the instruction at position `pc` in `C`.
+-/
 @[grind] def instr_at (C : List instr) (pc : Int) : Option instr :=
   match C with
   | [] => .none
   | i :: C' => if pc = 0 then .some i else instr_at C' (pc - 1)
 
+/-
+  The semantics of the machine is given in small-step style as a transition system:
+  a relation between machine configurations "before" and "after" execution
+  of the instruction at the current program point.
+  The transition relation is parameterized by the code `C` for the whole program.
+  There is one transition for each kind of instruction,
+  except `.Ihalt`, which has no transition.
+-/
 @[grind] inductive transition (C : List instr) : config → config → Prop where
   | trans_const : ∀ pc stk s n,
       instr_at C pc = .some (.Iconst n) →
@@ -66,22 +108,51 @@ def config : Type := Int × stack × store
       transition C (pc , n2 :: n1 :: stk, s)
                    (pc', stk            , s)
 
+/-
+  As usual with small-step semantics, we form sequences of machine transitions
+  to define the behavior of a code.  Zero, one or several transitions
+  correspond to the reflexive transitive closure of relation `transition C`.
+-/
 @[grind] def transitions (C : List instr) : config → config → Prop :=
   star (transition C)
 
+/-
+  We always start with `pc = 0` and an empty evaluation stack.
+  We stop successfully if `pc` points to an `.Ihalt` instruction
+  and the evaluation stack is empty.
+-/
 def machine_terminates (C : List instr) (s_init : store) (s_final : store) : Prop :=
   ∃ pc, transitions C (0, [], s_init) (pc, [], s_final)
           ∧ instr_at C pc = .some .Ihalt
 
+/-
+  The machine can also run forever, making infinitely many transitions.
+-/
 def machine_diverges (C : List instr) (s_init : store) : Prop :=
   infseq (transition C) (0, [], s_init)
 
+/-
+  Yet another possibility is that the machine gets stuck after some transitions.
+-/
 def machine_goes_wrong (C : List instr) (s_init : store) : Prop :=
   ∃ pc stk s,
       transitions C (0, [], s_init) (pc, stk, s)
    ∧ irred (transition C) (pc, stk, s)
    ∧ (instr_at C pc ≠ .some .Ihalt ∨ stk ≠ [])
 
+/-
+  3. The compilation scheme
+
+  We now define the compilation of IMP expressions and commands to
+    sequence of machine instructions.
+  The code for an arithmetic expression `a` executes in sequence (no
+  branches), and deposits the value of `a` at the top of the stack.
+  This is the familiar translation to "reverse Polish notation".
+
+  The only twist here is that the machine has no "subtract" instruction.
+  However, it can compute the difference `a - b` by adding `a` to the
+  opposite of `b`.
+-/
 @[grind] def compile_aexp (a : aexp) : List instr :=
   match a with
   | .CONST n => .Iconst n :: []
@@ -89,6 +160,17 @@ def machine_goes_wrong (C : List instr) (s_init : store) : Prop :=
   | .PLUS a1 a2  => (compile_aexp a1) ++ (compile_aexp a2) ++ (.Iadd :: [])
   | .MINUS a1 a2 => compile_aexp a1 ++ compile_aexp a2 ++ (.Iopp :: .Iadd :: [])
 
+/-
+  For Boolean expressions `b`, we could produce code that deposits `1` or `0`
+  at the top of the stack, depending on whether `b` is true or false.
+  The compiled code for `.IFTHENELSE` and `.WHILE` commands would, then,
+  compare this 0/1 value against 0 and branch to the appropriate piece of code.
+
+  However, it is simpler and more efficient to compile a Boolean expression `b`
+  to a piece of code that directly jumps `d1` or `d0` instructions forward,
+  depending on whether `b` is true or false.  The actual value of `b` is
+  never computed as an integer, and the stack is unchanged.
+-/
 @[grind] def compile_bexp (b : bexp) (d1 : Int) (d0 : Int) : List instr :=
   match b with
   | .TRUE => if d1 = 0 then [] else .Ibranch d1 :: []
@@ -101,6 +183,13 @@ def machine_goes_wrong (C : List instr) (s_init : store) : Prop :=
       let code1 := compile_bexp b1 0 (codelen code2 + d0)
       code1 ++ code2
 
+/-
+  The code for a command `c`:
+  - updates the store (the values of variables) as prescribed by `c`
+  - preserves the stack
+  - finishes "at the end" of the generated code: the next instruction
+    executed is the instruction that will follow the generated code.
+-/
 @[grind] def compile_com (c : com) : List instr :=
   match c with
   | .SKIP =>
@@ -123,6 +212,10 @@ def machine_goes_wrong (C : List instr) (s_init : store) : Prop :=
       ++ code_body
       ++ .Ibranch (- (codelen code_test + codelen code_body + 1)) :: []
 
+/-
+  The code for a program `p` (a command) is similar, but terminates
+  cleanly on an `.Ihalt` instruction.
+-/
 def compile_program (p : com) : List instr :=
   compile_com p ++ .Ihalt :: []
 
@@ -133,11 +226,25 @@ def compile_program (p : com) : List instr :=
 def smart_Ibranch (d : Int) : List instr :=
   if d = 0 then [] else .Ibranch d :: []
 
+/-
+  4. First compiler correctness proofs
+-/
+
+/-
+  To reason about the execution of compiled code, we need to consider
+  code sequences `C2` that are at position `pc` in a bigger code
+  sequence `C = C1 ++ C2 ++ C3`.  The following predicate
+  `code_at C pc C2` does just this.
+-/
 @[grind] inductive code_at : List instr → Int → List instr → Prop where
   | code_at_intro : ∀ C1 C2 C3 pc,
       pc = codelen C1 ->
       code_at (C1 ++ C2 ++ C3) pc C2
 
+/-
+  We show a number of simple lemmas about `instr_at` and `code_at`,
+  and annotate them with `@[grind]`, so that `grind` can use them automatically.
+-/
 @[grind =] theorem codelen_cons :
   ∀ i c, codelen (i :: c) = codelen c + 1 := by grind
 
@@ -232,6 +339,21 @@ theorem code_at_head :
 @[grind] theorem code_at_to_instr_at : code_at C pc (c1 ++ i :: c2) → instr_at C (pc + codelen c1) = .some i := by
   grind
 
+/-
+  4.1 Correctness of generated code for expressions.
+-/
+
+/-
+  Remember the informal specification we gave for the code generated
+  for an arithmetic expression `a`.  It should
+  - execute in sequence (no branches)
+  - deposit the value of `a` at the top of the stack
+  - preserve the variable state.
+
+  We now prove that the code `compile_aexp a` fulfills this contract.
+  The proof is a nice induction on the structure of `a`.
+-/
+
 theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) (stk : stack) :
   code_at C pc (compile_aexp a) →
   transitions C (pc, stk, s) (pc + codelen (compile_aexp a), aeval s a :: stk, s) := by
@@ -275,7 +397,16 @@ theorem compile_aexp_correct (C : List instr) (s : store) (a : aexp) (pc : Int) 
             · have := @code_at_to_instr_at C pc (compile_aexp a1 ++ compile_aexp a2 ++ [instr.Iopp])
               have := @transition.trans_add
               grind
--- Miss 5
+
+/-
+  The proof for the compilation of Boolean expressions is similar.
+  We recall the informal specification for the code generated by
+  [compile_bexp b d1 d0]: it should
+  - skip `d1` instructions if `b` evaluates to true,
+       `d0` if `b` evaluates to false
+  - leave the stack unchanged
+  - leave the store unchanged.
+-/
 theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : Int) (pc : Int) (stk : stack) (h : code_at C pc (compile_bexp b d1 d0))  :
    transitions C
        (pc, stk, s)
@@ -344,7 +475,9 @@ theorem compile_bexp_correct (C : List instr) (s : store) (b : bexp) (d1 d0 : In
           exact b2_ih
         case neg isFalse =>
           grind
-
+/-
+  4.2 Correctness of generated code for commands, terminating case.
+-/
 theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s c s') :
  ∀ C pc stk, code_at C pc (compile_com c) →
   transitions C
@@ -453,6 +586,36 @@ theorem compile_com_correct_terminating (s s' : store) (c : com) (h₁ : cexec s
             apply ih2
           grind
 
+/-
+  7.  Full proof of compiler correctness
+
+  We would like to strengthen the correctness result above so that it
+  is not restricted to terminating source programs, but also applies to
+  source program that diverge.  To this end, we abandon the big-step
+  semantics for commands and switch to the small-step semantics with
+  continuations.  We then show a simulation theorem, establishing that
+  every transition of the small-step semantics in the source program
+  is simulated (in a sense to be made precise below) by zero, one or
+  several transitions of the machine executing the compiled code for
+  the source program.
+
+  Our first task is to relate configurations `(c, k, s)` of the small-step
+  semantics with configurations `(C, pc, stk, s)` of the machine.
+  We already know how to relate a command `c` with the machine code,
+  using the `codeseq_at` predicate.  What needs to be defined is a relation
+  between the continuation `k` and the machine code.
+
+  Intuitively, when the machine finishes executing the generated code for
+  command `c`, that is, when it reaches the program point
+  `pc + codelen(compile_com c)`, the machine should continue by executing
+  instructions that perform the pending computations described by
+  continuation `k`, then reach an `.Ihalt` instruction to stop cleanly.
+
+  We formalize this intution by the following inductive predicate
+  `compile_cont C k pc`, which states that, starting at program point `pc`,
+  there are instructions that perform the computations described in `k`
+  and reach an `.Ihalt` instruction.
+-/
 inductive compile_cont (C : List instr) : cont -> Int -> Prop where
   | ccont_stop : ∀ pc,
       instr_at C pc = .some .Ihalt ->
@@ -474,13 +637,51 @@ inductive compile_cont (C : List instr) : cont -> Int -> Prop where
       pc' = pc + 1 + d ->
       compile_cont C k pc' ->
       compile_cont C k pc
-
+/-
+  Then, a configuration `(c,k,s)` of the small-step semantics matches
+  a configuration `(C, pc, stk, s')` of the machine if the following conditions hold:
+  - The stores are identical: `s' = s`.
+  - The machine stack is empty: `stk = []]`.
+  - The machine code at point `pc` is the compiled code for `c`:
+  `code_at C pc (compile_com c)`.
+  - The machine code at point `pc + codelen (compile_com c)` matches continuation
+  `k`, in the sense of `compile_cont` above.
+-/
 inductive match_config (C : List instr) : com × cont × store -> config -> Prop where
   | match_config_intro : ∀ c k st pc,
       code_at C pc (compile_com c) ->
       compile_cont C k (pc + codelen (compile_com c)) ->
       match_config C (c, k, st) (pc, [], st)
 
+/-
+  We are now ready to prove the expected simulation property.
+  Since some transitions in the source command correspond to zero transitions
+  in the compiled code, we need a simulation diagram of the "star" kind.
+                      match_config
+     c / k / st  ----------------------- machconfig
+       |                                   |
+       |                                   | + or ( * and |c',k'| < |c,k| )
+       |                                   |
+       v                                   v
+    c' / k' / st' ----------------------- machconfig'
+                      match_config
+
+  Note the stronger conclusion on the right:
+  - either the virtual machine does one or several transitions
+  - or it does zero, one or several transitions, but the size of the `c,k`
+  pair decreases strictly.
+
+  It would be equivalent to state:
+  - either the virtual machine does one or several transitions
+  - or it does zero transitions, but the size of the `c,k` pair decreases strictly.
+
+  However, the formulation above, with the "star" case, is often more convenient.
+
+  Finding an appropriate "anti-stuttering" measure is a bit of a black art.
+  After trial and error, we find that the following measure works.  It is
+  the sum of the sizes of the command `c` under focus and all the commands
+  appearing in the continuation `k`.
+-/
 def com_size (c : com) : Nat :=
   match c with
   | .SKIP => 1
@@ -488,7 +689,6 @@ def com_size (c : com) : Nat :=
   | (c1 ;; c2) => (com_size c1 + com_size c2 + 1)
   | .IFTHENELSE _ c1 c2 => (com_size c1 + com_size c2 + 1)
   | .WHILE _ c1 => (com_size c1 + 1)
-
 
 theorem com_size_nonzero : ∀ c, (com_size c > 0) := by
   intro c
@@ -504,6 +704,9 @@ def measure' (impconf : com × cont × store) : Nat :=
   match impconf with
   | (c, k, _) => (com_size c + cont_size k)
 
+/-
+  A few technical lemmas to help with the simulation proof.
+-/
 theorem compile_cont_Kstop_inv (C : List instr) (pc : Int) (s : store) :
   compile_cont C .Kstop pc →
   ∃ pc',
@@ -560,6 +763,9 @@ theorem match_config_skip (C : List instr) (k : cont) (s : store) (pc : Int) (H 
   · cases H <;> grind
   · grind
 
+/-
+  At last, we can state and prove the simulation diagram.
+-/
 theorem simulation_step :
   ∀ C impconf1 impconf2 machconf1,
   step impconf1 impconf2 ->
@@ -731,6 +937,13 @@ theorem simulation_step :
           · exact w₂.1
           · exact w₂.2
 
+/-
+  The hard work is done!  Nice consequences will follow.
+
+  First, we get an alternate proof of `compile_program_correct_terminating`,
+  using the continuation semantics instead of the big-step semantics
+  to characterize termination of the source program.
+-/
 theorem simulation_steps :
   ∀ C impconf1 impconf2, star step impconf1 impconf2 ->
   ∀ machconf1, match_config C impconf1 machconf1 ->
@@ -796,6 +1009,11 @@ theorem compile_program_correct_terminating_2 :
           exact D
       · exact E
 
+/-
+  Second, and more importantly, we get a proof of semantic preservation
+  for diverging source programs: if the program makes infinitely many steps,
+  the generated code makes infinitely many machine transitions.
+-/
 theorem simulation_infseq_inv :
   ∀ C n impconf1 machconf1,
   infseq step impconf1 -> match_config C impconf1 machconf1 ->
