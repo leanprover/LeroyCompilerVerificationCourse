@@ -3,6 +3,7 @@ Copyright (c) 2025 Lean FRO, LLC. All rights reserved.
 Released under LGPL 2.1 license as described in the file LICENSE.md.
 Authors: Wojciech Różowski
 -/
+
 import LeroyCompilerVerificationCourse.Imp
 
 /-
@@ -34,9 +35,6 @@ import LeroyCompilerVerificationCourse.Imp
 
 /-
   A piece of machine code is a list of instructions.
--/
-
-/-
   The length (number of instructions) of a piece of code.
 -/
 @[grind] def codelen (c : List instr) : Int := c.length
@@ -228,9 +226,7 @@ def smart_Ibranch (d : Int) : List instr :=
 
 /-
   4. First compiler correctness proofs
--/
 
-/-
   To reason about the execution of compiled code, we need to consider
   code sequences `C2` that are at position `pc` in a bigger code
   sequence `C = C1 ++ C2 ++ C3`.  The following predicate
@@ -341,9 +337,7 @@ theorem code_at_head :
 
 /-
   4.1 Correctness of generated code for expressions.
--/
 
-/-
   Remember the informal specification we gave for the code generated
   for an arithmetic expression `a`.  It should
   - execute in sequence (no branches)
