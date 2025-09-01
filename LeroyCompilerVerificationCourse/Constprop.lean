@@ -7,7 +7,6 @@ Authors: Wojciech Różowski
 import LeroyCompilerVerificationCourse.Imp
 import Std.Data.HashMap
 
-
 /-
   8. An optimization: constant propagation
 
