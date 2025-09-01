@@ -50,7 +50,7 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   | _, _ => .PLUS a1 a2
 
 /-
-  `mk_MINUS a1 a2]` produces an expression equivalent to `MINUS a1 a2`
+  `mk_MINUS a1 a2` produces an expression equivalent to `MINUS a1 a2`
   using similar tricks.  Note that "expression minus constant" is
   always normalized into "expression plus opposite constant",
   simplifying the case analyses. *)
@@ -75,7 +75,7 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   | .MINUS a1 a2 => mk_MINUS (simplif_aexp a1) (simplif_aexp a2)
 
 /-
-  An example
+  An example:
 
   Compute `simplif_aexp (.MINUS (.PLUS (.VAR "x") (.CONST 1)) (.PLUS (.VAR "y") (.CONST 1)))`
 -/
@@ -163,7 +163,7 @@ theorem mk_AND_sound :
     any_goals grind
 /-
   Even commands can benefit from smart constructors!  Here is a smart
-   `.IFTHENELSE` and a smart `.WHILE` that take known conditions into account.
+  `.IFTHENELSE` and a smart `.WHILE` that take known conditions into account.
 -/
 @[grind] def mk_IFTHENELSE (b : bexp) (c1 c2 : com) : com :=
   match b with
@@ -215,7 +215,7 @@ theorem cexec_mk_WHILE_loop : ∀ b c s1 s2 s3,
   This meaning is captured by the `matches s s'` predicate below,
   which says whether a concrete store `s` belongs to an
   abstract store `s'` obtained by static analysis.
-  (A bit like a term belongs to a type in a type system.
+  (A bit like a term belongs to a type in a type system.)
 -/
 def Store := Std.HashMap ident Int
 @[grind] def matches' (s : store) (S : Store) : Prop :=
@@ -279,7 +279,7 @@ theorem Equal_Le : ∀ S1 S2, Equal S1 S2 -> Le S1 S2 := by
   The abstract, compile-time evaluation of expressions returns `.some v`
   if the value `v` of the expression can be determined based on what
   the abstract store `S` tells us about the values of variables.
-  Otherwise, `.none`is returned.
+  Otherwise, `.none` is returned.
 -/
 @[grind] def lift1 {A B : Type} (f : A -> B) (o : Option A) : Option B :=
   match o with
