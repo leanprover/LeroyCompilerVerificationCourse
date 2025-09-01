@@ -6,6 +6,14 @@ Authors: Wojciech Różowski
 
 import LeroyCompilerVerificationCourse.Imp
 import Std.Data.HashMap
+
+
+/-
+  8. An optimization: constant propagation
+
+  8.1 Simplifying expressions using smart constructors
+-/
+
 open Classical in
 instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   beq m n := Id.run do
@@ -16,6 +24,10 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
       | some v => if e.2 != v then return false
     return true
 
+/-
+  `mk_PLUS_CONST a n` produces an expression equivalent to `.PLUS a (.CONST n)`
+  but further simplified.
+-/
 @[grind] def mk_PLUS_CONST (a : aexp) (n : Int) : aexp :=
   if n = 0 then a else
   match a with
@@ -23,6 +35,12 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   | .PLUS a (.CONST m) => .PLUS a (.CONST (m + n))
   | _ => .PLUS a (.CONST n)
 
+/-
+  `mk_PLUS a1 a2` produces a simplified expression equivalent to `.PLUS a1 a2`.
+  It uses associativity and commutativity to find the pattern
+  "an expression plus a constant", then uses `mk_PLUS_CONST`to simplify
+  further.
+-/
 @[grind] def mk_PLUS (a1 a2 : aexp) : aexp :=
   match a1, a2 with
   | .CONST m, _ => mk_PLUS_CONST a2 m
@@ -32,6 +50,12 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   | _, .PLUS a2 (.CONST m2) => mk_PLUS_CONST (.PLUS a1 a2) m2
   | _, _ => .PLUS a1 a2
 
+/-
+  `mk_MINUS a1 a2]` produces an expression equivalent to `MINUS a1 a2`
+  using similar tricks.  Note that "expression minus constant" is
+  always normalized into "expression plus opposite constant",
+  simplifying the case analyses. *)
+-/
 @[grind] def mk_MINUS (a1 a2 : aexp) : aexp :=
   match a1, a2 with
   | _, .CONST m => mk_PLUS_CONST a1 (-m)
@@ -40,6 +64,10 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   | _, .PLUS a2 (.CONST m2) => mk_PLUS_CONST (.MINUS a1 a2) (-m2)
   | _, _ => .MINUS a1 a2
 
+/-
+  To simplify an expression, we rewrite it bottom-up, applying the smart
+  constructors at each step.
+-/
 @[grind] def simplif_aexp (a : aexp) : aexp :=
   match a with
   | .CONST n => .CONST n
@@ -47,10 +75,19 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   | .PLUS a1 a2 => mk_PLUS (simplif_aexp a1) (simplif_aexp a2)
   | .MINUS a1 a2 => mk_MINUS (simplif_aexp a1) (simplif_aexp a2)
 
+/-
+  An example
+
+  Compute `simplif_aexp (.MINUS (.PLUS (.VAR "x") (.CONST 1)) (.PLUS (.VAR "y") (.CONST 1)))`
+-/
 /-- info: aexp.MINUS (aexp.VAR "x") (aexp.VAR "y") -/
 #guard_msgs in
 #eval simplif_aexp (.MINUS (.PLUS (.VAR "x") (.CONST 1)) (.PLUS (.VAR "y") (.CONST 1)))
 
+/-
+  To show the soundness of these simplifications, we show that the
+  optimized expressions evaluate to the same values as the original expressions.
+-/
 @[grind] theorem mk_PLUS_CONST_sound :
   ∀ s a n, aeval s (mk_PLUS_CONST a n) = aeval s a + n := by
     intro s a n
@@ -74,6 +111,10 @@ theorem simplif_aexp_sound : ∀ s a, aeval s (simplif_aexp a) = aeval s a := by
   induction a
   any_goals grind [mk_PLUS_sound, mk_MINUS_sound]
 
+/-
+  We can play the same game for Boolean expressions.
+  Here are the smart constructors and their proofs of correctness
+-/
 @[grind] def mk_EQUAL (a1 a2 : aexp) : bexp :=
   match a1, a2 with
   | .CONST n1, .CONST n2 => if n1 = n2 then .TRUE else .FALSE
@@ -121,7 +162,10 @@ theorem mk_AND_sound :
     intro s b1 b2
     fun_cases mk_AND b1 b2
     any_goals grind
-
+/-
+  Even commands can benefit from smart constructors!  Here is a smart
+   `.IFTHENELSE` and a smart `.WHILE` that take known conditions into account.
+-/
 @[grind] def mk_IFTHENELSE (b : bexp) (c1 c2 : com) : com :=
   match b with
   | .TRUE => c1
@@ -151,10 +195,37 @@ theorem cexec_mk_WHILE_loop : ∀ b c s1 s2 s3,
     intro b c s1 s2 s3 h1 h2 h3
     fun_cases (mk_WHILE b c) <;> grind
 
+/-
+  8.2 A static analysis for constant propagation
+
+  The static analysis we need operates over finite maps from variables (strings)
+  to values (integers). We represent these using `Std.HashMap` from Lean's standard library.
+
+  Our static analysis is going to compute "abstract stores", that is,
+  compile-time approximations of run-time stores.  This is an instance
+  of the general theory of abstract interpretation.
+
+  (Notational convention: we use Capitalized identifiers to refer to
+  abstract things and lowercase identifiers to refer to concrete things.)
+
+  Abstract stores `Store` are represented as finite maps from variable names
+  to integers.  If a variable `x` is mapped to `n`, it means that
+  we statically know that the run-time value of `x` is `n`.  If `x` is not mapped,
+  it means that the run-time value of `x` can be anything.
+
+  This meaning is captured by the `matches s s'` predicate below,
+  which says whether a concrete store `s` belongs to an
+  abstract store `s'` obtained by static analysis.
+  (A bit like a term belongs to a type in a type system.
+-/
 def Store := Std.HashMap ident Int
 @[grind] def matches' (s : store) (S : Store) : Prop :=
   ∀ x n, S.get? x = .some n -> s x = n
 
+/-
+  Abstract stores have a lattice structure, with an order `Le`, a top element,
+  and a join operation.  We can also test whether two abstract stores are equal.
+-/
 @[grind] def Le (S1 S2 : Store) : Prop :=
   ∀ x n, S2.get? x = .some n -> S1.get? x = .some n
 
@@ -163,12 +234,15 @@ def Store := Std.HashMap ident Int
 @[grind] def Join (S1 S2 : Store) : Store :=
   S1.filter (fun key _ => S2.get? key == S1.get? key)
 
--- In leroy's course this is decidable
 def Equal (S1 S2 : Store) := Std.HashMap.Equiv S1 S2
 
 noncomputable instance : Decidable (Equal S' S) :=
   Classical.propDecidable (Equal S' S)
 
+/-
+  We show the soundness of these lattice operations with respect to
+  the `matches` and the `Le` relations.
+-/
 theorem matches_Le : ∀ s S1 S2, Le S1 S2 -> matches' s S1 -> matches' s S2 := by
   intro s S1 S2 h1 h2
   grind
@@ -202,6 +276,12 @@ theorem Equal_Le : ∀ S1 S2, Equal S1 S2 -> Le S1 S2 := by
   have := @Std.HashMap.Equiv.getElem?_eq _ _ _ _ S1 S2 _ _ x eq
   grind
 
+/-
+  The abstract, compile-time evaluation of expressions returns `.some v`
+  if the value `v` of the expression can be determined based on what
+  the abstract store `S` tells us about the values of variables.
+  Otherwise, `.none`is returned.
+-/
 @[grind] def lift1 {A B : Type} (f : A -> B) (o : Option A) : Option B :=
   match o with
   | .some x => .some (f x)
@@ -227,6 +307,9 @@ theorem Equal_Le : ∀ S1 S2, Equal S1 S2 -> Le S1 S2 := by
   | .NOT b1 => lift1 (fun m => !m) (Beval S b1)
   | .AND b1 b2 => lift2 (fun m n => m && n) (Beval S b1) (Beval S b2)
 
+/-
+  These compile-time evaluations are sound, in the following sense.
+-/
 @[grind] theorem Aeval_sound :
   ∀ s S, matches' s S ->
   ∀ a n, Aeval S a = .some n -> aeval s a = n := by
@@ -266,7 +349,10 @@ theorem Beval_sound :
       unfold lift2 at h2
       split at h2 <;> grind
 
-
+/-
+  To analyze assignments, we need to update abstract stores with the result
+  of `Aeval`.
+-/
 @[grind] def Update (x : ident) (N : Option Int) (S : Store) : Store :=
   match N with
   | .none => S.erase x
@@ -293,7 +379,18 @@ theorem matches_update : ∀ s S x n N,
   matches' (update x n s) (Update x N S) := by
     intro s S x n N m h
     grind
+/-
+  To analyze loops, we will need to find fixpoints of a function from
+  abstract states to abstract states.  Intuitively, this corresponds
+  to executing the loop in the abstract, stopping iterations when the
+  abstract state is stable.
 
+  Computing exact fixpoints with guaranteed termination is not easy;
+  we will return to this question at the end of the lectures.
+  In the meantime, we will use the simple, approximate algorithm below,
+  which stops after a fixed number of iterations and returns `Top`
+  if no fixpoint has been found earlier.
+-/
 @[grind] noncomputable def fixpoint_rec (F : Store -> Store) (fuel : Nat) (S : Store) : Store :=
   match fuel with
   | 0 => Top
@@ -301,11 +398,17 @@ theorem matches_update : ∀ s S x n N,
       let S' := F S
       if Equal S' S then S else fixpoint_rec F fuel S'
 
+/-
+  Let's say that we will do at most 20 iterations.
+-/
 @[grind] def num_iter : Nat := 20
 
 @[grind] noncomputable def fixpoint (F : Store -> Store) (init_S : Store) : Store :=
   fixpoint_rec F num_iter init_S
-
+/-
+  The result `S` of `fixpoint F` is sound, in that it satisfies
+  `F S ⊑ S` in the lattice ordering.
+-/
 theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint F init_S) :
   Le (F S) S := by
     have A : ∀ fuel S,
@@ -319,7 +422,13 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
     have E : S = Top \/ Equal (F S) S = true := by grind
     cases E <;> grind [Equal_Le]
 
-
+/-
+  Now we can analyze commands by executing them "in the abstract".
+  Given an abstract store `S` that represents what we statically know
+  about the values of the variables before executing command `c`,
+  `cexec'` returns an abstract store that describes the values of
+  the variables after executing `c`.
+-/
 @[grind] noncomputable def Cexec (S : Store) (c : com) : Store :=
   match c with
   | .SKIP => S
@@ -333,6 +442,9 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
   | .WHILE _ c1 =>
       fixpoint (fun x => Join S (Cexec x c1)) S
 
+/-
+  The soundness of the analysis follows.
+-/
 @[grind] theorem Cexec_sound :
   ∀ c s1 s2 S1,
   cexec s1 c s2 -> matches' s1 S1 -> matches' s2 (Cexec S1 c) := by
@@ -411,7 +523,13 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
           apply matches_Le
           · apply Le_Join_l
           · exact MATCHES
+/-
+  8.3 The constant propagation optimization
 
+  We can use the results of the static analysis to simplify expressions
+  further, replacing variables with known values by these values, then
+  applying the smart constructors.
+-/
 @[grind =] def cp_aexp (S : Store) (a : aexp) : aexp :=
   match a with
   | .CONST n => .CONST n
@@ -420,7 +538,6 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
     | .none => .VAR x
   | .PLUS a1 a2 => mk_PLUS (cp_aexp S a1) (cp_aexp S a2)
   | .MINUS a1 a2 => mk_MINUS (cp_aexp S a1) (cp_aexp S a2)
-
 
 @[grind] def cp_bexp (S : Store) (b : bexp) : bexp :=
   match b with
@@ -431,13 +548,17 @@ theorem fixpoint_sound (F : Store → Store) (init_S : Store) (h : S = fixpoint 
   | .NOT b => mk_NOT (cp_bexp S b)
   | .AND b1 b2 => mk_AND (cp_bexp S b1) (cp_bexp S b2)
 
+/-
+  Under the assumption that the concrete store matchess with the abstract store,
+  these optimized expressions evaluate to the same values as the original
+  expressions.
+-/
 @[grind] theorem cp_aexp_sound :
   ∀ s S, matches' s S ->
   ∀ a, aeval s (cp_aexp S a) = aeval s a := by
     intro s S AG a
     induction a
     all_goals try grind
-    -- Unfortunately this grind call explodes on one of the goals since v4.23.0-rc2
     all_goals grind [mk_PLUS_sound, mk_MINUS_sound]
 
 theorem cp_bexp_sound :
@@ -446,6 +567,19 @@ theorem cp_bexp_sound :
     intro s S AG b
     induction b with grind [mk_EQUAL_sound, mk_LESSEQUAL_sound, mk_AND_sound, mk_NOT_sound]
 
+/-
+  The optimization of commands consists in propagating constants
+  in expressions and simplifying the expressions, as above.
+  In addition, conditionals and loops whose conditions are statically
+  known will be simplified too, thanks to the smart constructors.
+
+  The `S` parameter is the abstract store "before" the execution of `c`.
+  When recursing through `c`, it must be updated like the static analysis
+  `Cexec` does.  For example, if `c` is `.SEQ c1 c2`, `c2` is optimized
+  using `Cexec S c1` as abstract store "before".  Likewise, if
+  `c` is a loop `.WHILE b c1`, the loop body `c1` is optimized using
+  `Cexec S (.WHILE b c1)` as the abstract store "before".
+-/
 @[grind] noncomputable def cp_com (S : Store) (c : com) : com :=
   match c with
   | .SKIP => .SKIP
@@ -459,6 +593,13 @@ theorem cp_bexp_sound :
       let sfix := Cexec S (.WHILE b c)
       mk_WHILE (cp_bexp sfix b) (cp_com sfix c)
 
+/-
+  The proof of semantic preservation needs an unusual induction pattern:
+  structural induction on the command `c`, plus an inner induction
+  on the number of iterations if `c` is a loop `.WHILE b c1`.
+  This pattern follows closely the structure of the abstract interpreter
+  `Cexec`: structural induction on the command + local fixpoint for loops.
+-/
 theorem cp_com_correct_terminating :
   ∀ c s1 s2 S1,
   cexec s1 c s2 -> matches' s1 S1 -> cexec s1 (cp_com S1 c) s2 := by
