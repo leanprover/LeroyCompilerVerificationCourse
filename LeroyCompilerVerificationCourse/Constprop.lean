@@ -53,7 +53,7 @@ instance [BEq α] [BEq β] [Hashable α] : BEq (Std.HashMap α β) where
   `mk_MINUS a1 a2` produces an expression equivalent to `MINUS a1 a2`
   using similar tricks.  Note that "expression minus constant" is
   always normalized into "expression plus opposite constant",
-  simplifying the case analyses. *)
+  simplifying the case analyses.
 -/
 @[grind] def mk_MINUS (a1 a2 : aexp) : aexp :=
   match a1, a2 with

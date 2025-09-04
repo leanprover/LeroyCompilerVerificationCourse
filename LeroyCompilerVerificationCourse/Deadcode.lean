@@ -65,7 +65,7 @@ instance : EmptyCollection IdentSet where
 /-
   To analyze loops, we will need, again!, to compute post-fixpoints
   of a function from sets of variables to sets of variables.
-  We reuse the ``engineer's approach'' from file `Constprop.lean`.
+  We reuse the "engineer's approach" from file `Constprop.lean`.
 -/
 @[grind] noncomputable def deadcode_fixpoint_rec (F : IdentSet → IdentSet) (default : IdentSet) (fuel : Nat) (x : IdentSet) : IdentSet :=
   match fuel with
@@ -200,7 +200,7 @@ theorem agree_update_dead :
        |                                          |
        |                                          |
        v                                          v
-      s' -------------------------------------- s1'ß
+      s' -------------------------------------- s1'
                     agree L s' s1'
 
   The proof is a simple induction on the big-step evaluation derivation on the left.
