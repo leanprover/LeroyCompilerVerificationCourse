@@ -7,6 +7,9 @@ Authors: Wojciech Różowski
 import LeroyCompilerVerificationCourse.Imp
 import Std.Data.HashSet
 
+/-
+  10.  Liveness analysis and dead code elimination
+-/
 abbrev IdentSet := Std.HashSet ident
 
 instance : HasSubset IdentSet where
@@ -30,6 +33,11 @@ instance : EmptyCollection IdentSet where
 @[grind] theorem insert_characterisation (a : IdentSet) (x : ident) : x ∈ a.insert x := by
   grind
 
+/-
+  10.1 Liveness analysis
+
+  Computation of the set of variables appearing in an expression or command.
+-/
 @[grind] def fv_aexp (a : aexp) : IdentSet :=
   match a with
   | .CONST _ => ∅
@@ -54,6 +62,11 @@ instance : EmptyCollection IdentSet where
   | .IFTHENELSE b c1 c2 => (fv_bexp b) ∪ ((fv_com c1) ∪ (fv_com c2))
   | .WHILE b c => (fv_bexp b) ∪ (fv_com c)
 
+/-
+  To analyze loops, we will need, again!, to compute post-fixpoints
+  of a function from sets of variables to sets of variables.
+  We reuse the ``engineer's approach'' from file `Constprop.lean`.
+-/
 @[grind] noncomputable def deadcode_fixpoint_rec (F : IdentSet → IdentSet) (default : IdentSet) (fuel : Nat) (x : IdentSet) : IdentSet :=
   match fuel with
   | 0 => default
@@ -78,6 +91,12 @@ theorem fixpoint_upper_bound (F : IdentSet → IdentSet) (default : IdentSet) (F
     induction n with grind
   grind
 
+/-
+  Liveness analysis.
+
+  `L` is the set of variables live "after" command `c`.
+  The result of `live c L` is the set of variables live "before" `c`.
+-/
 @[grind] noncomputable def live (c : com) (L : IdentSet) : IdentSet :=
   match c with
   | .SKIP => L
@@ -105,6 +124,12 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
   (eq : L' = live (.WHILE b c) L) :
   (fv_bexp b) ⊆ L' ∧ L ⊆ L' ∧ (live c L') ⊆ L' := by grind
 
+/-
+  10.2 The optimization: dead code elimination
+
+  Dead code elimination turns assignments `.ASSIGN x a` to dead variables `x`
+  into `.SKIP` statements.
+-/
 @[grind] noncomputable def dce (c : com) (L : IdentSet) : com :=
   match c with
   | .SKIP => .SKIP
@@ -113,13 +138,26 @@ theorem live_while_charact (b : bexp) (c : com) (L L' : IdentSet)
   | .IFTHENELSE b c1 c2 => .IFTHENELSE b (dce c1 L) (dce c2 L)
   | .WHILE b c => .WHILE b (dce c (live (.WHILE b c) L))
 
+/-
+  10.3  Correctness of the optimization
+
+  Two stores agree on a set `L` of live variables if they assign
+  the same values to each live variable.
+-/
 @[grind] def agree (L : IdentSet) (s1 s2 : store) : Prop :=
   ∀ x, x  ∈ L -> s1 x = s2 x
 
+/-
+  Monotonicity property.
+-/
 @[grind] theorem agree_mon :
   ∀ L L' s1 s2,
   agree L' s1 s2 -> L ⊆ L' -> agree L s1 s2 := by grind
 
+/-
+  Agreement on the free variables of an expression implies that this
+  expression evaluates identically in both stores.
+-/
 @[grind] theorem aeval_agree :
   ∀ L s1 s2, agree L s1 s2 ->
   ∀ a, (fv_aexp a) ⊆ L -> aeval s1 a = aeval s2 a := by
@@ -136,16 +174,37 @@ theorem beval_agree :
     intro L s1 s2 AG b
     induction b with grind
 
+/-
+  Agreement is preserved by simultaneous assignment to a live variable.
+-/
 theorem agree_update_live :
   ∀ s1 s2 L x v,
   agree (L.erase x) s1 s2 ->
   agree L (update x v s1) (update x v s2) := by grind
 
+/-
+  Agreement is also preserved by unilateral assignment to a dead variable.
+-/
 theorem agree_update_dead :
   ∀ s1 s2 L x v,
   agree L s1 s2 -> ¬x ∈ L ->
   agree L (update x v s1) s2 := by grind
 
+/-
+  We now show that dead code elimination preserves semantics for terminating
+  source program.  We use big-step semantics to show the following diagram:
+
+                agree (live c L) s s1
+     c / s ----------------------------- dce C L / s1
+       |                                          |
+       |                                          |
+       |                                          |
+       v                                          v
+      s' -------------------------------------- s1'ß
+                    agree L s' s1'
+
+  The proof is a simple induction on the big-step evaluation derivation on the left.
+-/
 theorem dce_correct_terminating :
   ∀ s c s', cexec s c s' ->
   ∀ L s1, agree (live c L) s s1 ->
