@@ -10,6 +10,16 @@ import Batteries.Data.List.Perm
 
 universe u
 
+/-
+  9. More about fixpoints
+
+  9.1 From Knaster-Tarski to effective computation of fixpoints
+-/
+
+/-
+  Consider a type `α` equipped with a decidable equality `eq` and a
+  transitive ordering `le`.
+-/
 @[grind] class OrderStruct (α : Sort u) where
   eq : α → α → Prop
   le : α → α → Prop
@@ -20,14 +30,24 @@ universe u
   gt_wf : WellFounded (fun x y : α => le y x ∧ ¬eq y x)
 open OrderStruct
 
+/-
+  This is the strict order induced by `le`.  We assume it is well-founded:
+  all strictly ascending chains are finite.
+-/
 @[grind] def gt {α : Sort u} [OrderStruct α] (x y : α) : Prop := le y x ∧ ¬eq y x
 
 def gt_well_founded {α : Sort u} [OrderStruct α] : WellFounded (gt : α → α → Prop) := by apply @gt_wf
 
+/-
+  Let `bot` be a smallest element of `α`.
+-/
 class OrderWithBot (α : Sort u) extends OrderStruct α where
   bot : α
   bot_smallest : ∀ x, le bot x
 
+/-
+  Let `F` be a monotonic function from `α` to `α`.
+-/
 class Monotone (α : Sort u) (F : α → α) [OrderStruct α] where
   F_mon : ∀ {x y : α}, le x y → le (F x) (F y)
 
@@ -38,6 +58,10 @@ section FixpointExistence
 variable (α : Sort u) (F : α → α) [OrderWithBot α]
 
 open OrderStruct OrderWithBot
+/-
+  Let's show the existence of a fixpoint, as in the Knaster-Tarski theorem.
+  The proof is by well-founded induction.
+-/
 theorem fixpoint_exists_1 [Monotone α F] : ∃ x : α, eq x (F x) := by
   have REC : ∀ x : α, le x (F x) -> ∃ y : α , eq y (F y) := by
     intro x
@@ -59,6 +83,32 @@ theorem fixpoint_exists_1 [Monotone α F] : ∃ x : α, eq x (F x) := by
   apply REC
   apply bot_smallest
 
+/-
+Unfortunately, we cannot extract the value of the fixpoint.
+-/
+/--
+error: Tactic `cases` failed with a nested error:
+Tactic `induction` failed: recursor `Exists.casesOn` can only eliminate into `Prop`
+
+α : Sort u
+F : α → α
+inst✝ : OrderWithBot α
+motive : (∃ x, eq x (F x)) → Sort ?u.1192
+h_1 : (x : α) → (P : eq x (F x)) → motive ⋯
+fixpoint✝ : ∃ x, eq x (F x)
+⊢ motive fixpoint✝ after processing
+  _
+the dependent pattern matcher can solve the following kinds of equations
+- <var> = <term> and <term> = <var>
+- <term> = <term> where the terms are definitionally equal
+- <constructor> = <constructor>, examples: List.cons x xs = List.cons y ys, and List.cons x xs = List.nil
+-/
+#guard_msgs in
+def cannotExtractFixpoint [Monotone α F] : α :=
+  let fixpoint := fixpoint_exists_1 α F
+  match fixpoint with
+  | ⟨x, P⟩ => x
+
 end FixpointExistence
 
 section Iterate
@@ -71,12 +121,29 @@ instance : WellFoundedRelation α  where
   rel := gt
   wf := gt_wf
 
+/-
+  We can alternatively write the iteration algorithm explicitly,
+  proving later that it is correct.
+
+  The algorithm is simple: we iterate `F` starting from a pre-fixpoint `x`
+
+  The `iterate` function takes as argument not just `x`, but also two proofs:
+  - that `x` is a pre-fixpoint, i.e. `le x (F x)`
+  - that `x` is below any post-fixpoint `z`.
+
+  Likewise, it returns as result not just the fixpoint `y`, but also two proofs:
+  - that `y` is a fixpoint, i.e. `eq y (F y)`
+  - that `y` is below any post-fixpoint `z`.
+-/
 @[grind] def iterate (x : α) (PRE : le x (F x)) (SMALL : ∀ z, le (F z) z -> le x z) : α :=
   if beq x (F x) then x else iterate (F x) (by apply F_mon; exact PRE) (by intro z hyp; specialize SMALL z hyp; apply le_trans; apply F_mon; exact SMALL; exact hyp)
   termination_by x
   decreasing_by
     grind [beq_false']
 
+/-
+  We then prove that the algorithm implemented above indeed calculates the least fixpoint of `F`.
+-/
 @[grind] theorem iterate_correct (x : α) (PRE : le x (F x)) (SMALL : ∀ z, le (F z) z -> le x z) (heq : y = iterate _ F x PRE SMALL ) : eq y (F y) ∧ ∀ z, le (F z) z → le y z := by
   fun_induction iterate
   case case1 x' PRE SMALL isTrue  =>
@@ -96,8 +163,14 @@ section Fixpoint
 open OrderWithBot
 variable {α : Sort u} [i : OrderWithBot α] (F : α → α) [Monotone α F]
 
+/-
+  The fixpoint is obtained by iterating from `bot`.
+-/
 @[grind] def fixpoint' : α := iterate α F bot (by apply bot_smallest) (by grind [bot_smallest])
 
+/-
+  It is therefore both a fixpoint and the smallest post-fixpoint.
+-/
 theorem fixpoint_correct :
   eq (fixpoint' F) (F (fixpoint' F)) ∧ ∀ z : α, le (F z) z → le (fixpoint' F) z := by
     unfold fixpoint'
@@ -109,6 +182,13 @@ theorem fixpoint_correct :
     · rfl
 end Fixpoint
 
+/-
+  9.2 Application to constant propagation analysis
+
+  First, we equip the type of abstract stores with the required equality
+  and ordering predicates.  `le` and `beq` are defined in `Constprop.lean`,
+  under the names `Le` and `Equal`.
+-/
 section Constprop
 
 open Std.HashMap
@@ -136,6 +216,9 @@ def Eq'_sym : ∀ S1 S2, Eq' S1 S2 → Eq' S2 S1 := by
 
 @[grind] def Gt (S1 S2 : Store) := Le S2 S1 ∧ ¬ Eq' S2 S1
 
+/-
+  We will use monotonically increasing functions a lot.
+-/
 @[grind] def Increasing (F : Store → Store) := ∀ x y, Le x y → Le (F x) (F y)
 
 theorem hash_set_incl_size_leq (S1 S2 : Store) : Le S2 S1 → List.Subperm (S1.toList) (S2.toList) := by
@@ -150,6 +233,12 @@ theorem hash_set_incl_size_leq (S1 S2 : Store) : Le S2 S1 → List.Subperm (S1.t
     specialize LE k v (by grind)
     grind
 
+/-
+  The really hard proof is to show that the strict order `Gt` is
+  well-founded.  For this we reason on the cardinal of the finite maps
+  representing abstract stores, that is, the number of "`x` is mapped to `n`" facts
+  contained in abstract stores.
+-/
 @[grind] theorem Le_cardinal :
   ∀ S T : Store,
   Le T S ->
@@ -197,6 +286,11 @@ noncomputable instance : OrderStruct Store where
   gt_wf := Gt_wf
 end Constprop
 
+/-
+  Another difficulty is that our type of abstract stores does not have
+  a smallest element `bot`.  But for the kind of functions we take fixpoints of,
+  we know a pre-fixpoint we can start iterating with.
+-/
 section FixpointJoin
 variable (Init : Store)
 variable (F : Store → Store) [Monotone Store F]
@@ -263,6 +357,15 @@ theorem fixpoint_join_smallest :
     · unfold fixpoint_join
       dsimp
 
+
+/-
+  Now we can try to use the `fixpoint_join` function above in the `Cexec`
+  static analyzer. Howver, we need to simulateneously define the `Cexec` function, while
+  showing that it is increasing.
+
+  This can be done, but we'll need a lot of lemmas about increasing
+  functions first.
+-/
 @[grind] theorem Join_increasing :
   ∀ S1 S2 S3 S4,
   Le S1 S2 -> Le S3 S4 -> Le (Join S1 S3) (Join S2 S4) := by grind
@@ -312,6 +415,10 @@ theorem fixpoint_join_increasing (_ : Store) (F : Store → Store) (F_mon : ∀ 
     · exact hyp
     · grind
 
+/-
+  At long last, we can define `Cexec` while at the same time showing that
+  it is increasing.
+-/
 noncomputable def Cexec' : (c : com) →  {F : Store → Store // ∀ x y, le x y → le (F x) (F y)}
 | .SKIP => ⟨(fun S => S), by grind⟩
 | .ASSIGN x a => ⟨(fun S => Update x (Aeval S a) S), by
