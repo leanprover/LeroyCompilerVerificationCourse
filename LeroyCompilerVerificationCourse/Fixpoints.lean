@@ -357,7 +357,6 @@ theorem fixpoint_join_smallest :
     · unfold fixpoint_join
       dsimp
 
-
 /-
   Now we can try to use the `fixpoint_join` function above in the `Cexec`
   static analyzer. Howver, we need to simulateneously define the `Cexec` function, while
